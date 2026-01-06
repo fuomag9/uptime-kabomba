@@ -24,3 +24,23 @@ extra/exe-builder/obj
 
 .vs
 .vscode
+
+# Go backend
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/uptime-kuma-go
+/cmd/server/server
+go.sum
+*.db
+*.db-shm
+*.db-wal
+
+# Next.js frontend
+/web/.next/
+/web/build/
+/web/node_modules/
+/bin
