@@ -26,8 +26,8 @@ func Load() *Config {
 	return &Config{
 		Port: getEnvInt("PORT", 8080),
 		Database: DatabaseConfig{
-			Type:         getEnv("DB_TYPE", "sqlite"),
-			DSN:          getEnv("DB_DSN", "./data/kuma.db"),
+			Type:         getEnv("DATABASE_TYPE", "sqlite"),
+			DSN:          getEnv("DATABASE_DSN", "/data/uptime.db"),
 			MaxOpenConns: getEnvInt("DB_MAX_OPEN_CONNS", 25),
 			MaxIdleConns: getEnvInt("DB_MAX_IDLE_CONNS", 5),
 		},

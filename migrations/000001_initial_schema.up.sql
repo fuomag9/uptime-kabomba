@@ -24,9 +24,9 @@ CREATE TABLE IF NOT EXISTS monitors (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_monitors_user_id ON monitors(user_id);
-CREATE INDEX idx_monitors_type ON monitors(type);
-CREATE INDEX idx_monitors_active ON monitors(active);
+CREATE INDEX IF NOT EXISTS idx_monitors_user_id ON monitors(user_id);
+CREATE INDEX IF NOT EXISTS idx_monitors_type ON monitors(type);
+CREATE INDEX IF NOT EXISTS idx_monitors_active ON monitors(active);
 
 -- Heartbeats table
 CREATE TABLE IF NOT EXISTS heartbeats (
@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS heartbeats (
     FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_heartbeats_monitor_time ON heartbeats(monitor_id, time DESC);
-CREATE INDEX idx_heartbeats_time ON heartbeats(time);
+CREATE INDEX IF NOT EXISTS idx_heartbeats_monitor_time ON heartbeats(monitor_id, time DESC);
+CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON heartbeats(time);
 
 -- Statistics tables
 CREATE TABLE IF NOT EXISTS stat_minutely (
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS stat_minutely (
     FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_stat_minutely_monitor_time ON stat_minutely(monitor_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_stat_minutely_monitor_time ON stat_minutely(monitor_id, timestamp DESC);
 
 CREATE TABLE IF NOT EXISTS stat_hourly (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS stat_hourly (
     FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_stat_hourly_monitor_time ON stat_hourly(monitor_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_stat_hourly_monitor_time ON stat_hourly(monitor_id, timestamp DESC);
 
 CREATE TABLE IF NOT EXISTS stat_daily (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS stat_daily (
     FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_stat_daily_monitor_time ON stat_daily(monitor_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_stat_daily_monitor_time ON stat_daily(monitor_id, timestamp DESC);
 
 -- Notifications table
 CREATE TABLE IF NOT EXISTS notifications (
@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 
 -- Monitor-Notification mapping
 CREATE TABLE IF NOT EXISTS monitor_notifications (
@@ -138,5 +138,5 @@ CREATE TABLE IF NOT EXISTS api_keys (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_api_keys_user_id ON api_keys(user_id);
-CREATE INDEX idx_api_keys_key ON api_keys(key);
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(key);

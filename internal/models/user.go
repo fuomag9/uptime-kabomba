@@ -8,6 +8,6 @@ type User struct {
 	Username   string    `json:"username" db:"username"`
 	Password   string    `json:"-" db:"password"` // Never expose password in JSON
 	Active     bool      `json:"active" db:"active"`
-	TotpSecret string    `json:"-" db:"totp_secret"` // 2FA secret
+	TotpSecret *string   `json:"-" db:"totp_secret"` // 2FA secret (nullable)
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }

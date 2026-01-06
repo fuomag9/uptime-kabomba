@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -37,26 +38,35 @@ func HandleLogin(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			log.Println("Login: Failed to decode request:", err.Error())
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
 
+		log.Println("Login attempt for username:", req.Username)
+
 		// Find user
 		var user models.User
-		err := db.Get(&user, "SELECT * FROM users WHERE username = $1", req.Username)
+		err := db.Get(&user, "SELECT * FROM users WHERE username = ?", req.Username)
 		if err != nil {
+			log.Println("Login: User not found:", req.Username, "Error:", err.Error())
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
+
+		log.Println("Login: User found, checking password. Hash:", user.Password[:20]+"...")
 
 		// Verify password
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+			log.Println("Login: Password check failed:", err.Error())
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
 
+		log.Println("Login: Success for user:", req.Username)
+
 		// Check 2FA if enabled
-		if user.TotpSecret != "" {
+		if user.TotpSecret != nil && *user.TotpSecret != "" {
 			// TODO: Implement 2FA verification
 			// For now, skip 2FA check
 		}
@@ -97,7 +107,12 @@ func HandleSetup(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
 
 		// Check if setup is already done
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM users")
+		err := db.Get(&count, "SELECT COUNT(*) FROM users")
+		if err != nil {
+			log.Println("Error checking user count:", err.Error())
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
 		if count > 0 {
 			http.Error(w, "Setup already completed", http.StatusBadRequest)
 			return
@@ -106,24 +121,25 @@ func HandleSetup(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
 		// Hash password
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
+			log.Println("Error hashing password:", err.Error())
 			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
 			return
 		}
 
 		// Create user
-		result, err := db.Exec(
-			"INSERT INTO users (username, password, active, created_at) VALUES ($1, $2, $3, $4)",
+		var userID int
+		err = db.QueryRow(
+			"INSERT INTO users (username, password, active, created_at) VALUES (?, ?, ?, ?) RETURNING id",
 			req.Username, string(hashedPassword), true, time.Now(),
-		)
+		).Scan(&userID)
 		if err != nil {
+			log.Println("Error creating user:", err.Error())
 			http.Error(w, "Failed to create user", http.StatusInternalServerError)
 			return
 		}
 
-		userID, _ := result.LastInsertId()
-
 		// Generate JWT
-		token, err := generateJWT(int(userID), cfg.JWTSecret)
+		token, err := generateJWT(userID, cfg.JWTSecret)
 		if err != nil {
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 			return
@@ -134,7 +150,7 @@ func HandleSetup(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
 		json.NewEncoder(w).Encode(LoginResponse{
 			Token: token,
 			User: &models.User{
-				ID:       int(userID),
+				ID:       userID,
 				Username: req.Username,
 				Active:   true,
 			},

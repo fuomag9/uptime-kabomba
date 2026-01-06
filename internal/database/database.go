@@ -2,6 +2,8 @@ package database
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"           // PostgreSQL driver
@@ -16,6 +18,12 @@ func Connect(cfg config.DatabaseConfig) (*sqlx.DB, error) {
 
 	switch cfg.Type {
 	case "sqlite":
+		// Ensure directory exists for SQLite
+		dir := filepath.Dir(cfg.DSN)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create database directory: %w", err)
+		}
+
 		db, err = sqlx.Connect("sqlite3", cfg.DSN+"?_foreign_keys=on&_journal_mode=WAL")
 	case "postgres":
 		db, err = sqlx.Connect("postgres", cfg.DSN)

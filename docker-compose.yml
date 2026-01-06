@@ -1,9 +1,9 @@
 services:
-  # Uptime Kuma with SQLite (default)
-  uptime-kuma:
+  # Backend API
+  backend:
     build: .
     image: uptime-kuma-go:latest
-    container_name: uptime-kuma
+    container_name: uptime-kuma-backend
     ports:
       - "8080:8080"
     volumes:
@@ -20,6 +20,22 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+
+  # Frontend Web UI
+  frontend:
+    image: node:20-alpine
+    container_name: uptime-kuma-frontend
+    working_dir: /app
+    volumes:
+      - ./web:/app
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+    command: sh -c "npm install && npm run dev"
+    restart: unless-stopped
+    depends_on:
+      - backend
 
 volumes:
   uptime-data:

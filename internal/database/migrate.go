@@ -35,7 +35,7 @@ func RunMigrations(cfg config.DatabaseConfig) error {
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://migrations",
+		"file://./migrations",
 		cfg.Type,
 		driver,
 	)

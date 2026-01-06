@@ -47,17 +47,42 @@ A complete rewrite of [Uptime Kuma](https://github.com/louislam/uptime-kuma) in 
 
 ## Quick Start
 
-### Using Docker (Recommended)
+### Using Docker Compose (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/uptime-kuma-go
 cd uptime-kuma-go
 
-# Start with Docker Compose
+# Start both backend and frontend
 docker-compose up -d
 
-# Access at http://localhost:8080
+# Access the web UI
+open http://localhost:3000
+
+# Backend API runs on http://localhost:8080
+```
+
+The system runs two services:
+- **Frontend**: Next.js dev server on port 3000
+- **Backend**: Go API server on port 8080
+
+**Useful Commands:**
+```bash
+# View logs
+docker-compose logs -f
+
+# View backend logs only
+docker-compose logs -f backend
+
+# View frontend logs only
+docker-compose logs -f frontend
+
+# Stop services
+docker-compose down
+
+# Stop and remove all data
+docker-compose down -v
 ```
 
 ### Manual Installation
