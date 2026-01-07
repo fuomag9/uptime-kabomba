@@ -21,11 +21,11 @@ jobs:
       matrix:
         include:
           - service: backend
-            dockerfile: Dockerfile
+            dockerfile: ./Dockerfile
             context: .
           - service: frontend
-            dockerfile: Dockerfile
-            context: web
+            dockerfile: ./Dockerfile
+            context: ./web
 
     steps:
       - name: Checkout repository
