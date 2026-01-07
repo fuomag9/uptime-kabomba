@@ -1,6 +1,6 @@
-# Uptime Kuma (Go + Next.js Rewrite)
+# Uptime Kabomba - Technical Documentation
 
-A modern rewrite of Uptime Kuma using Go for the backend and Next.js for the frontend.
+A modern uptime monitoring solution built with Go for the backend and Next.js for the frontend.
 
 ## Architecture
 
@@ -167,28 +167,22 @@ go test ./internal/api/...
 
 ```bash
 # Build binary
-go build -o uptime-kuma-go cmd/server/main.go
+go build -o uptime-kabomba-server cmd/server/main.go
 
 # Run binary
-./uptime-kuma-go
+./uptime-kabomba-server
 ```
 
-## Docker (Coming Soon)
+## Docker
 
 ```bash
 # Build image
-docker build -t uptime-kuma-go .
+docker build -t uptime-kabomba .
 
 # Run container
-docker run -p 8080:8080 -v $(pwd)/data:/app/data uptime-kuma-go
+docker run -p 8080:8080 -v $(pwd)/data:/app/data uptime-kabomba
 ```
 
 ## License
 
-MIT (same as original Uptime Kuma)
-
-## Credits
-
-Original Uptime Kuma by Louis Lam: https://github.com/louislam/uptime-kuma
-
-This is a complete rewrite using Go and Next.js for modern performance and maintainability.
+MIT - See LICENSE file for details
