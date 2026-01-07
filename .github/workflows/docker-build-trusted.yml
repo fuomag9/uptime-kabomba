@@ -27,8 +27,8 @@ jobs:
             dockerfile: Dockerfile
             context: .
           - service: frontend
-            dockerfile: web/Dockerfile
-            context: ./web
+            dockerfile: Dockerfile
+            context: web
 
     steps:
       - name: Checkout repository
