@@ -21,11 +21,11 @@ jobs:
       matrix:
         include:
           - service: backend
-            dockerfile: ./Dockerfile
+            dockerfile: Dockerfile
             context: .
           - service: frontend
-            dockerfile: ./Dockerfile
-            context: ./web
+            dockerfile: Dockerfile
+            context: web
 
     steps:
       - name: Checkout repository
@@ -47,7 +47,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
+          file: ${{ matrix.context }}/${{ matrix.dockerfile }}
           push: false
           load: true
           tags: ${{ steps.meta.outputs.tags }}
