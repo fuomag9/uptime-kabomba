@@ -168,7 +168,7 @@ func HandleGetCurrentUser(db *sqlx.DB) http.HandlerFunc {
 }
 
 // AuthMiddleware validates JWT tokens
-func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
+func AuthMiddleware(jwtSecret string, db *sqlx.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -196,10 +196,16 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			claims := token.Claims.(jwt.MapClaims)
 			userID := int(claims["user_id"].(float64))
 
-			// TODO: Load user from database and add to context
-			user := &models.User{ID: userID}
+			// Load user from database
+			var user models.User
+			err = db.Get(&user, "SELECT * FROM users WHERE id = ?", userID)
+			if err != nil {
+				log.Println("AuthMiddleware: Failed to load user:", err.Error())
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
+				return
+			}
 
-			ctx := context.WithValue(r.Context(), userContextKey, user)
+			ctx := context.WithValue(r.Context(), userContextKey, &user)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

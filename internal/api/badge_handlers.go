@@ -23,7 +23,7 @@ func HandleStatusBadge(db *sqlx.DB) http.HandlerFunc {
 
 		// Check if monitor exists
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = $1", id)
+		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ?", id)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -31,7 +31,7 @@ func HandleStatusBadge(db *sqlx.DB) http.HandlerFunc {
 
 		// Get latest heartbeat
 		var status int
-		query := `SELECT status FROM heartbeats WHERE monitor_id = $1 ORDER BY time DESC LIMIT 1`
+		query := `SELECT status FROM heartbeats WHERE monitor_id = ? ORDER BY time DESC LIMIT 1`
 		err = db.Get(&status, query, id)
 
 		var statusText, color string
@@ -76,7 +76,7 @@ func HandleUptimeBadge(db *sqlx.DB) http.HandlerFunc {
 
 		// Check if monitor exists
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = $1", id)
+		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ?", id)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -145,7 +145,7 @@ func HandlePingBadge(db *sqlx.DB) http.HandlerFunc {
 
 		// Check if monitor exists
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = $1", id)
+		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ?", id)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -153,7 +153,7 @@ func HandlePingBadge(db *sqlx.DB) http.HandlerFunc {
 
 		// Get average ping from last 10 heartbeats
 		var avgPing float64
-		query := `SELECT AVG(ping) FROM (SELECT ping FROM heartbeats WHERE monitor_id = $1 AND status = 1 ORDER BY time DESC LIMIT 10)`
+		query := `SELECT AVG(ping) FROM (SELECT ping FROM heartbeats WHERE monitor_id = ? AND status = 1 ORDER BY time DESC LIMIT 10)`
 		err = db.Get(&avgPing, query, id)
 
 		var pingText, color string

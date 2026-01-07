@@ -26,7 +26,7 @@ func HandleGetMonitors(db *sqlx.DB) http.HandlerFunc {
 
 		var monitors []models.Monitor
 		query := `SELECT id, user_id, name, type, url, interval, timeout, active, config, created_at, updated_at
-		          FROM monitors WHERE user_id = $1 ORDER BY created_at DESC`
+		          FROM monitors WHERE user_id = ? ORDER BY created_at DESC`
 
 		err := db.Select(&monitors, query, user.ID)
 		if err != nil {
@@ -54,7 +54,7 @@ func HandleGetMonitor(db *sqlx.DB) http.HandlerFunc {
 
 		var mon models.Monitor
 		query := `SELECT id, user_id, name, type, url, interval, timeout, active, config, created_at, updated_at
-		          FROM monitors WHERE id = $1 AND user_id = $2`
+		          FROM monitors WHERE id = ? AND user_id = ?`
 
 		err := db.Get(&mon, query, monitorID, user.ID)
 		if err != nil {
@@ -131,7 +131,7 @@ func HandleCreateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 		// Insert into database
 		query := `
 			INSERT INTO monitors (user_id, name, type, url, interval, timeout, active, config, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			RETURNING id
 		`
 
@@ -183,7 +183,7 @@ func HandleUpdateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 
 		// Verify ownership
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = $1 AND user_id = $2", mon.ID, user.ID)
+		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ? AND user_id = ?", mon.ID, user.ID)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -227,9 +227,9 @@ func HandleUpdateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 		// Update database
 		query := `
 			UPDATE monitors
-			SET name = $1, type = $2, url = $3, interval = $4, timeout = $5,
-			    active = $6, config = $7, updated_at = $8
-			WHERE id = $9 AND user_id = $10
+			SET name = ?, type = ?, url = ?, interval = ?, timeout = ?,
+			    active = ?, config = ?, updated_at = ?
+			WHERE id = ? AND user_id = ?
 		`
 
 		_, err = db.Exec(query,
@@ -274,7 +274,7 @@ func HandleDeleteMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 		}
 
 		// Delete from database
-		query := `DELETE FROM monitors WHERE id = $1 AND user_id = $2`
+		query := `DELETE FROM monitors WHERE id = ? AND user_id = ?`
 		result, err := db.Exec(query, id, user.ID)
 		if err != nil {
 			http.Error(w, "Failed to delete monitor", http.StatusInternalServerError)
@@ -309,9 +309,9 @@ func HandleGetHeartbeats(db *sqlx.DB) http.HandlerFunc {
 		query := `
 			SELECT id, monitor_id, status, ping, important, message, time
 			FROM heartbeats
-			WHERE monitor_id = $1
+			WHERE monitor_id = ?
 			ORDER BY time DESC
-			LIMIT $2
+			LIMIT ?
 		`
 
 		err := db.Select(&heartbeats, query, monitorID, limit)

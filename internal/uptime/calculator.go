@@ -60,7 +60,7 @@ func (c *Calculator) CalculateUptimeForPeriod(monitorID int, duration time.Durat
 			SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as down_checks,
 			AVG(CASE WHEN status = 1 THEN ping ELSE NULL END) as average_ping
 		FROM heartbeats
-		WHERE monitor_id = $1 AND time >= $2 AND time <= $3
+		WHERE monitor_id = ? AND time >= ? AND time <= ?
 	`
 
 	var stats struct {
@@ -102,7 +102,7 @@ func (c *Calculator) CalculateUptimeForTimeRange(monitorID int, startTime, endTi
 			SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as down_checks,
 			AVG(CASE WHEN status = 1 THEN ping ELSE NULL END) as average_ping
 		FROM heartbeats
-		WHERE monitor_id = $1 AND time >= $2 AND time <= $3
+		WHERE monitor_id = ? AND time >= ? AND time <= ?
 	`
 
 	var stats struct {
@@ -176,7 +176,7 @@ func (c *Calculator) GetDailyUptimeHistory(monitorID int, days int) ([]DailyUpti
 			COUNT(*) as total_checks,
 			SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as up_checks
 		FROM heartbeats
-		WHERE monitor_id = $1 AND time >= $2 AND time <= $3
+		WHERE monitor_id = ? AND time >= ? AND time <= ?
 		GROUP BY DATE(time)
 		ORDER BY date ASC
 	`
@@ -232,7 +232,7 @@ func (c *Calculator) GetHourlyUptimeHistory(monitorID int) ([]HourlyUptimePoint,
 			COUNT(*) as total_checks,
 			SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as up_checks
 		FROM heartbeats
-		WHERE monitor_id = $1 AND time >= $2 AND time <= $3
+		WHERE monitor_id = ? AND time >= ? AND time <= ?
 		GROUP BY hour
 		ORDER BY hour ASC
 	`

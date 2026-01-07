@@ -112,7 +112,7 @@ func (d *Dispatcher) getMonitorNotifications(monitorID int) ([]*Notification, er
 		SELECT n.id, n.user_id, n.name, n.type, n.config, n.is_default, n.active, n.created_at, n.updated_at
 		FROM notifications n
 		INNER JOIN monitor_notifications mn ON n.id = mn.notification_id
-		WHERE mn.monitor_id = $1 AND n.active = true
+		WHERE mn.monitor_id = ? AND n.active = true
 	`
 
 	var notifications []*Notification

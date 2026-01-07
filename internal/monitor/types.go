@@ -27,7 +27,7 @@ type Monitor struct {
 	Interval int                    `json:"interval" db:"interval"` // seconds
 	Timeout  int                    `json:"timeout" db:"timeout"`   // seconds
 	Active   bool                   `json:"active" db:"active"`
-	Config   map[string]interface{} `json:"config"`       // Type-specific config
+	Config   map[string]interface{} `json:"config" db:"-"` // Type-specific config (not from DB)
 	ConfigJSON string                `json:"-" db:"config"` // JSON storage
 	CreatedAt time.Time             `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time             `json:"updated_at" db:"updated_at"`

@@ -83,7 +83,7 @@ func (e *Executor) StartMonitor(monitor *Monitor) {
 	var lastHeartbeat struct {
 		Status int `db:"status"`
 	}
-	query := `SELECT status FROM heartbeats WHERE monitor_id = $1 ORDER BY time DESC LIMIT 1`
+	query := `SELECT status FROM heartbeats WHERE monitor_id = ? ORDER BY time DESC LIMIT 1`
 	if err := e.db.Get(&lastHeartbeat, query, monitor.ID); err == nil {
 		lastStatus = lastHeartbeat.Status
 	}
@@ -219,7 +219,7 @@ func (job *monitorJob) runCheck() {
 func (job *monitorJob) saveHeartbeat(heartbeat *Heartbeat) error {
 	query := `
 		INSERT INTO heartbeats (monitor_id, status, ping, important, message, time)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := job.executor.db.Exec(query,

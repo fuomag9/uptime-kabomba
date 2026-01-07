@@ -20,7 +20,7 @@ func HandleGetStatusPages(db *sqlx.DB) http.HandlerFunc {
 
 		var pages []models.StatusPage
 		query := `SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at
-		          FROM status_pages WHERE user_id = $1 ORDER BY created_at DESC`
+		          FROM status_pages WHERE user_id = ? ORDER BY created_at DESC`
 
 		err := db.Select(&pages, query, user.ID)
 		if err != nil {
@@ -41,7 +41,7 @@ func HandleGetStatusPage(db *sqlx.DB) http.HandlerFunc {
 
 		var page models.StatusPage
 		query := `SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at
-		          FROM status_pages WHERE id = $1 AND user_id = $2`
+		          FROM status_pages WHERE id = ? AND user_id = ?`
 
 		err := db.Get(&page, query, pageID, user.ID)
 		if err != nil {
@@ -55,7 +55,7 @@ func HandleGetStatusPage(db *sqlx.DB) http.HandlerFunc {
 			SELECT m.id, m.user_id, m.name, m.type, m.url, m.interval, m.timeout, m.active, m.config, m.created_at, m.updated_at
 			FROM monitors m
 			INNER JOIN status_page_monitors spm ON m.id = spm.monitor_id
-			WHERE spm.status_page_id = $1
+			WHERE spm.status_page_id = ?
 			ORDER BY spm.display_order ASC
 		`
 		db.Select(&monitors, monitorQuery, pageID)
@@ -94,7 +94,7 @@ func HandleCreateStatusPage(db *sqlx.DB) http.HandlerFunc {
 
 		// Validate slug is unique
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE slug = $1", req.Slug)
+		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE slug = ?", req.Slug)
 		if count > 0 {
 			http.Error(w, "Slug already exists", http.StatusConflict)
 			return
@@ -114,7 +114,7 @@ func HandleCreateStatusPage(db *sqlx.DB) http.HandlerFunc {
 		// Insert status page
 		query := `
 			INSERT INTO status_pages (user_id, slug, title, description, published, show_powered_by, theme, custom_css, password, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			RETURNING id
 		`
 
@@ -134,7 +134,7 @@ func HandleCreateStatusPage(db *sqlx.DB) http.HandlerFunc {
 		if len(req.MonitorIDs) > 0 {
 			for i, monitorID := range req.MonitorIDs {
 				_, err := db.Exec(
-					"INSERT INTO status_page_monitors (status_page_id, monitor_id, display_order) VALUES ($1, $2, $3)",
+					"INSERT INTO status_page_monitors (status_page_id, monitor_id, display_order) VALUES (?, ?, ?)",
 					pageID, monitorID, i,
 				)
 				if err != nil {
@@ -146,7 +146,7 @@ func HandleCreateStatusPage(db *sqlx.DB) http.HandlerFunc {
 
 		// Return created page
 		var page models.StatusPage
-		db.Get(&page, "SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at FROM status_pages WHERE id = $1", pageID)
+		db.Get(&page, "SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at FROM status_pages WHERE id = ?", pageID)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -179,14 +179,14 @@ func HandleUpdateStatusPage(db *sqlx.DB) http.HandlerFunc {
 
 		// Verify ownership
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = $1 AND user_id = $2", pageID, user.ID)
+		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
 		if count == 0 {
 			http.Error(w, "Status page not found", http.StatusNotFound)
 			return
 		}
 
 		// Check slug uniqueness (excluding current page)
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE slug = $1 AND id != $2", req.Slug, pageID)
+		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE slug = ? AND id != ?", req.Slug, pageID)
 		if count > 0 {
 			http.Error(w, "Slug already exists", http.StatusConflict)
 			return
@@ -206,9 +206,9 @@ func HandleUpdateStatusPage(db *sqlx.DB) http.HandlerFunc {
 		// Update status page
 		query := `
 			UPDATE status_pages
-			SET slug = $1, title = $2, description = $3, published = $4, show_powered_by = $5,
-			    theme = $6, custom_css = $7, password = $8, updated_at = $9
-			WHERE id = $10 AND user_id = $11
+			SET slug = ?, title = ?, description = ?, published = ?, show_powered_by = ?,
+			    theme = ?, custom_css = ?, password = ?, updated_at = ?
+			WHERE id = ? AND user_id = ?
 		`
 
 		_, err := db.Exec(query,
@@ -223,13 +223,13 @@ func HandleUpdateStatusPage(db *sqlx.DB) http.HandlerFunc {
 
 		// Update monitors
 		// First, delete all existing monitor associations
-		db.Exec("DELETE FROM status_page_monitors WHERE status_page_id = $1", pageID)
+		db.Exec("DELETE FROM status_page_monitors WHERE status_page_id = ?", pageID)
 
 		// Add new monitors
 		if len(req.MonitorIDs) > 0 {
 			for i, monitorID := range req.MonitorIDs {
 				db.Exec(
-					"INSERT INTO status_page_monitors (status_page_id, monitor_id, display_order) VALUES ($1, $2, $3)",
+					"INSERT INTO status_page_monitors (status_page_id, monitor_id, display_order) VALUES (?, ?, ?)",
 					pageID, monitorID, i,
 				)
 			}
@@ -237,7 +237,7 @@ func HandleUpdateStatusPage(db *sqlx.DB) http.HandlerFunc {
 
 		// Return updated page
 		var page models.StatusPage
-		db.Get(&page, "SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at FROM status_pages WHERE id = $1", pageID)
+		db.Get(&page, "SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at FROM status_pages WHERE id = ?", pageID)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(page)
@@ -251,7 +251,7 @@ func HandleDeleteStatusPage(db *sqlx.DB) http.HandlerFunc {
 		pageID := chi.URLParam(r, "id")
 
 		// Delete from database
-		result, err := db.Exec("DELETE FROM status_pages WHERE id = $1 AND user_id = $2", pageID, user.ID)
+		result, err := db.Exec("DELETE FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
 		if err != nil {
 			http.Error(w, "Failed to delete status page", http.StatusInternalServerError)
 			return
@@ -274,7 +274,7 @@ func HandleGetPublicStatusPage(db *sqlx.DB) http.HandlerFunc {
 
 		var page models.StatusPage
 		query := `SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, password, created_at, updated_at
-		          FROM status_pages WHERE slug = $1 AND published = 1`
+		          FROM status_pages WHERE slug = ? AND published = 1`
 
 		err := db.Get(&page, query, slug)
 		if err != nil {
@@ -312,7 +312,7 @@ func HandleGetPublicStatusPage(db *sqlx.DB) http.HandlerFunc {
 			SELECT m.id, m.user_id, m.name, m.type, m.url, m.interval, m.timeout, m.active, m.config, m.created_at, m.updated_at
 			FROM monitors m
 			INNER JOIN status_page_monitors spm ON m.id = spm.monitor_id
-			WHERE spm.status_page_id = $1
+			WHERE spm.status_page_id = ?
 			ORDER BY spm.display_order ASC
 		`
 
@@ -326,7 +326,7 @@ func HandleGetPublicStatusPage(db *sqlx.DB) http.HandlerFunc {
 			// Get latest heartbeat
 			var heartbeat models.Heartbeat
 			heartbeatQuery := `SELECT id, monitor_id, status, ping, important, message, time
-			                   FROM heartbeats WHERE monitor_id = $1 ORDER BY time DESC LIMIT 1`
+			                   FROM heartbeats WHERE monitor_id = ? ORDER BY time DESC LIMIT 1`
 			if err := db.Get(&heartbeat, heartbeatQuery, monitor.ID); err == nil {
 				monitorsWithStatus[i].LastHeartbeat = &heartbeat
 			}
@@ -335,7 +335,7 @@ func HandleGetPublicStatusPage(db *sqlx.DB) http.HandlerFunc {
 		// Get recent incidents
 		var incidents []models.Incident
 		incidentQuery := `SELECT id, status_page_id, title, content, style, pin, created_at, updated_at
-		                  FROM incidents WHERE status_page_id = $1 ORDER BY pin DESC, created_at DESC LIMIT 10`
+		                  FROM incidents WHERE status_page_id = ? ORDER BY pin DESC, created_at DESC LIMIT 10`
 		db.Select(&incidents, incidentQuery, page.ID)
 
 		result := map[string]interface{}{
@@ -357,7 +357,7 @@ func HandleGetIncidents(db *sqlx.DB) http.HandlerFunc {
 
 		// Verify ownership
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = $1 AND user_id = $2", pageID, user.ID)
+		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
 		if count == 0 {
 			http.Error(w, "Status page not found", http.StatusNotFound)
 			return
@@ -365,7 +365,7 @@ func HandleGetIncidents(db *sqlx.DB) http.HandlerFunc {
 
 		var incidents []models.Incident
 		query := `SELECT id, status_page_id, title, content, style, pin, created_at, updated_at
-		          FROM incidents WHERE status_page_id = $1 ORDER BY pin DESC, created_at DESC`
+		          FROM incidents WHERE status_page_id = ? ORDER BY pin DESC, created_at DESC`
 
 		err := db.Select(&incidents, query, pageID)
 		if err != nil {
@@ -386,7 +386,7 @@ func HandleCreateIncident(db *sqlx.DB) http.HandlerFunc {
 
 		// Verify ownership
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = $1 AND user_id = $2", pageID, user.ID)
+		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
 		if count == 0 {
 			http.Error(w, "Status page not found", http.StatusNotFound)
 			return
@@ -406,7 +406,7 @@ func HandleCreateIncident(db *sqlx.DB) http.HandlerFunc {
 
 		query := `
 			INSERT INTO incidents (status_page_id, title, content, style, pin, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 			RETURNING id
 		`
 
@@ -420,7 +420,7 @@ func HandleCreateIncident(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		var incident models.Incident
-		db.Get(&incident, "SELECT id, status_page_id, title, content, style, pin, created_at, updated_at FROM incidents WHERE id = $1", incidentID)
+		db.Get(&incident, "SELECT id, status_page_id, title, content, style, pin, created_at, updated_at FROM incidents WHERE id = ?", incidentID)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -437,13 +437,13 @@ func HandleDeleteIncident(db *sqlx.DB) http.HandlerFunc {
 
 		// Verify ownership
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = $1 AND user_id = $2", pageID, user.ID)
+		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
 		if count == 0 {
 			http.Error(w, "Status page not found", http.StatusNotFound)
 			return
 		}
 
-		result, err := db.Exec("DELETE FROM incidents WHERE id = $1 AND status_page_id = $2", incidentID, pageID)
+		result, err := db.Exec("DELETE FROM incidents WHERE id = ? AND status_page_id = ?", incidentID, pageID)
 		if err != nil {
 			http.Error(w, "Failed to delete incident", http.StatusInternalServerError)
 			return

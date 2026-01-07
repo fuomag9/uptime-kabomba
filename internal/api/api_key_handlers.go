@@ -22,7 +22,7 @@ func HandleGetAPIKeys(db *sqlx.DB) http.HandlerFunc {
 
 		var apiKeys []models.APIKey
 		query := `SELECT id, user_id, name, key_hash, prefix, scopes, expires_at, last_used_at, created_at
-		          FROM api_keys WHERE user_id = $1 ORDER BY created_at DESC`
+		          FROM api_keys WHERE user_id = ? ORDER BY created_at DESC`
 
 		err := db.Select(&apiKeys, query, user.ID)
 		if err != nil {
@@ -114,7 +114,7 @@ func HandleCreateAPIKey(db *sqlx.DB) http.HandlerFunc {
 		// Insert into database
 		query := `
 			INSERT INTO api_keys (user_id, name, key_hash, prefix, scopes, expires_at, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 			RETURNING id
 		`
 
@@ -149,7 +149,7 @@ func HandleDeleteAPIKey(db *sqlx.DB) http.HandlerFunc {
 		keyID := chi.URLParam(r, "id")
 
 		// Delete from database
-		result, err := db.Exec("DELETE FROM api_keys WHERE id = $1 AND user_id = $2", keyID, user.ID)
+		result, err := db.Exec("DELETE FROM api_keys WHERE id = ? AND user_id = ?", keyID, user.ID)
 		if err != nil {
 			http.Error(w, "Failed to delete API key", http.StatusInternalServerError)
 			return
@@ -217,11 +217,11 @@ func APIKeyAuthMiddleware(db *sqlx.DB) func(http.Handler) http.Handler {
 			matchedKey.AfterLoad()
 
 			// Update last_used_at
-			db.Exec("UPDATE api_keys SET last_used_at = $1 WHERE id = $2", time.Now(), matchedKey.ID)
+			db.Exec("UPDATE api_keys SET last_used_at = ? WHERE id = ?", time.Now(), matchedKey.ID)
 
 			// Get user
 			var user models.User
-			userQuery := `SELECT id, username, active, created_at FROM users WHERE id = $1`
+			userQuery := `SELECT id, username, active, created_at FROM users WHERE id = ?`
 			err = db.Get(&user, userQuery, matchedKey.UserID)
 			if err != nil {
 				http.Error(w, "User not found", http.StatusUnauthorized)

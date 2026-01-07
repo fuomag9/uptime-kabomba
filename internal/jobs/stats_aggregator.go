@@ -56,7 +56,7 @@ func (a *StatsAggregator) aggregateMonitorHourly(monitorID int, hourStart, hourE
 			SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as down_count,
 			COUNT(*) as total_count
 		FROM heartbeats
-		WHERE monitor_id = $1 AND time >= $2 AND time < $3
+		WHERE monitor_id = ? AND time >= ? AND time < ?
 	`
 
 	var stats struct {
@@ -87,7 +87,7 @@ func (a *StatsAggregator) aggregateMonitorHourly(monitorID int, hourStart, hourE
 	// Insert or update hourly stat
 	upsertQuery := `
 		INSERT INTO stat_hourly (monitor_id, hour, ping_min, ping_max, ping_avg, up_count, down_count, total_count, uptime_percentage, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(monitor_id, hour) DO UPDATE SET
 			ping_min = EXCLUDED.ping_min,
 			ping_max = EXCLUDED.ping_max,
@@ -158,7 +158,7 @@ func (a *StatsAggregator) aggregateMonitorDaily(monitorID int, dayStart, dayEnd 
 			SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as down_count,
 			COUNT(*) as total_count
 		FROM heartbeats
-		WHERE monitor_id = $1 AND time >= $2 AND time < $3
+		WHERE monitor_id = ? AND time >= ? AND time < ?
 	`
 
 	var stats struct {
@@ -189,7 +189,7 @@ func (a *StatsAggregator) aggregateMonitorDaily(monitorID int, dayStart, dayEnd 
 	// Insert or update daily stat
 	upsertQuery := `
 		INSERT INTO stat_daily (monitor_id, date, ping_min, ping_max, ping_avg, up_count, down_count, total_count, uptime_percentage, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(monitor_id, date) DO UPDATE SET
 			ping_min = EXCLUDED.ping_min,
 			ping_max = EXCLUDED.ping_max,

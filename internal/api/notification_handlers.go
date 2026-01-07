@@ -20,7 +20,7 @@ func HandleGetNotificationsV2(db *sqlx.DB) http.HandlerFunc {
 
 		var notifications []models.Notification
 		query := `SELECT id, user_id, name, type, config, is_default, active, created_at, updated_at
-		          FROM notifications WHERE user_id = $1 ORDER BY created_at DESC`
+		          FROM notifications WHERE user_id = ? ORDER BY created_at DESC`
 
 		err := db.Select(&notifications, query, user.ID)
 		if err != nil {
@@ -41,7 +41,7 @@ func HandleGetNotification(db *sqlx.DB) http.HandlerFunc {
 
 		var notif models.Notification
 		query := `SELECT id, user_id, name, type, config, is_default, active, created_at, updated_at
-		          FROM notifications WHERE id = $1 AND user_id = $2`
+		          FROM notifications WHERE id = ? AND user_id = ?`
 
 		err := db.Get(&notif, query, notificationID, user.ID)
 		if err != nil {
@@ -95,7 +95,7 @@ func HandleCreateNotification(db *sqlx.DB) http.HandlerFunc {
 		// Insert into database
 		query := `
 			INSERT INTO notifications (user_id, name, type, config, is_default, active, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 			RETURNING id
 		`
 
@@ -153,7 +153,7 @@ func HandleUpdateNotification(db *sqlx.DB) http.HandlerFunc {
 
 		// Verify ownership
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM notifications WHERE id = $1 AND user_id = $2", id, user.ID)
+		db.Get(&count, "SELECT COUNT(*) FROM notifications WHERE id = ? AND user_id = ?", id, user.ID)
 		if count == 0 {
 			http.Error(w, "Notification not found", http.StatusNotFound)
 			return
@@ -182,8 +182,8 @@ func HandleUpdateNotification(db *sqlx.DB) http.HandlerFunc {
 		// Update database
 		query := `
 			UPDATE notifications
-			SET name = $1, type = $2, config = $3, is_default = $4, active = $5, updated_at = $6
-			WHERE id = $7 AND user_id = $8
+			SET name = ?, type = ?, config = ?, is_default = ?, active = ?, updated_at = ?
+			WHERE id = ? AND user_id = ?
 		`
 
 		_, err = db.Exec(query,
@@ -197,7 +197,7 @@ func HandleUpdateNotification(db *sqlx.DB) http.HandlerFunc {
 
 		// Return updated notification
 		var notif models.Notification
-		db.Get(&notif, "SELECT id, user_id, name, type, config, is_default, active, created_at, updated_at FROM notifications WHERE id = $1", id)
+		db.Get(&notif, "SELECT id, user_id, name, type, config, is_default, active, created_at, updated_at FROM notifications WHERE id = ?", id)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(notif)
@@ -218,7 +218,7 @@ func HandleDeleteNotification(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		// Delete from database
-		query := `DELETE FROM notifications WHERE id = $1 AND user_id = $2`
+		query := `DELETE FROM notifications WHERE id = ? AND user_id = ?`
 		result, err := db.Exec(query, id, user.ID)
 		if err != nil {
 			http.Error(w, "Failed to delete notification", http.StatusInternalServerError)
@@ -244,7 +244,7 @@ func HandleTestNotification(db *sqlx.DB, dispatcher *notification.Dispatcher) ht
 		// Get notification
 		var notif notification.Notification
 		query := `SELECT id, user_id, name, type, config, is_default, active, created_at, updated_at
-		          FROM notifications WHERE id = $1 AND user_id = $2`
+		          FROM notifications WHERE id = ? AND user_id = ?`
 
 		err := db.Get(&notif, query, notificationID, user.ID)
 		if err != nil {

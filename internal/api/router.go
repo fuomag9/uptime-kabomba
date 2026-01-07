@@ -44,7 +44,7 @@ func NewRouter(cfg *config.Config, db *sqlx.DB, hub *websocket.Hub, executor *mo
 
 		// Protected routes
 		r.Group(func(r chi.Router) {
-			r.Use(AuthMiddleware(cfg.JWTSecret))
+			r.Use(AuthMiddleware(cfg.JWTSecret, db))
 
 			// User routes
 			r.Get("/user/me", HandleGetCurrentUser(db))

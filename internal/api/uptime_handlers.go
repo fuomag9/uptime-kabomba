@@ -21,7 +21,7 @@ func HandleGetMonitorUptime(db *sqlx.DB) http.HandlerFunc {
 
 		// Verify ownership
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = $1 AND user_id = $2", monitorID, user.ID)
+		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ? AND user_id = ?", monitorID, user.ID)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -65,7 +65,7 @@ func HandleGetMonitorUptimeHistory(db *sqlx.DB) http.HandlerFunc {
 
 		// Verify ownership
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = $1 AND user_id = $2", monitorID, user.ID)
+		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ? AND user_id = ?", monitorID, user.ID)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -102,7 +102,7 @@ func HandleGetMonitorHourlyUptime(db *sqlx.DB) http.HandlerFunc {
 
 		// Verify ownership
 		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = $1 AND user_id = $2", monitorID, user.ID)
+		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ? AND user_id = ?", monitorID, user.ID)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -152,7 +152,7 @@ func HandleGetAllMonitorsUptime(db *sqlx.DB) http.HandlerFunc {
 
 		// Filter by user's monitors
 		var monitorIDs []int
-		query := `SELECT id FROM monitors WHERE user_id = $1 AND active = 1`
+		query := `SELECT id FROM monitors WHERE user_id = ? AND active = 1`
 		db.Select(&monitorIDs, query, user.ID)
 
 		userStats := make(map[int]*uptime.UptimeStats)

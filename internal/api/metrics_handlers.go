@@ -60,7 +60,7 @@ func HandlePrometheusMetrics(db *sqlx.DB) http.HandlerFunc {
 				Status int `db:"status"`
 				Ping   int `db:"ping"`
 			}
-			hbQuery := `SELECT status, ping FROM heartbeats WHERE monitor_id = $1 ORDER BY time DESC LIMIT 1`
+			hbQuery := `SELECT status, ping FROM heartbeats WHERE monitor_id = ? ORDER BY time DESC LIMIT 1`
 			if err := db.Get(&heartbeat, hbQuery, monitor.ID); err == nil {
 				// Monitor status
 				status := 0
