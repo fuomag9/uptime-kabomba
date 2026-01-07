@@ -23,16 +23,15 @@ services:
 
   # Frontend Web UI
   frontend:
-    image: node:20-alpine
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: uptime-kabomba-frontend:latest
     container_name: uptime-kabomba-frontend
-    working_dir: /app
-    volumes:
-      - ./web:/app
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8080
-    command: sh -c "npm install && npm run dev"
     restart: unless-stopped
     depends_on:
       - backend
