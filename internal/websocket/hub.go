@@ -133,7 +133,15 @@ func (c *Client) readPump() {
 	for {
 		_, message, err := c.Conn.Read(ctx)
 		if err != nil {
-			log.Printf("WebSocket read error: %v", err)
+			// Only log unexpected errors, not normal closures
+			status := websocket.CloseStatus(err)
+			if status == websocket.StatusNormalClosure ||
+			   status == websocket.StatusGoingAway ||
+			   status == websocket.StatusNoStatusRcvd {
+				// Normal disconnect - don't log as error
+				break
+			}
+			log.Printf("WebSocket unexpected error: %v", err)
 			break
 		}
 
@@ -155,7 +163,13 @@ func (c *Client) writePump() {
 	for message := range c.Send {
 		err := c.Conn.Write(ctx, websocket.MessageText, message)
 		if err != nil {
-			log.Printf("WebSocket write error: %v", err)
+			// Only log unexpected write errors
+			status := websocket.CloseStatus(err)
+			if status != websocket.StatusNormalClosure &&
+			   status != websocket.StatusGoingAway &&
+			   status != websocket.StatusNoStatusRcvd {
+				log.Printf("WebSocket unexpected write error: %v", err)
+			}
 			return
 		}
 	}

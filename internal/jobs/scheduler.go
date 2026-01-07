@@ -3,18 +3,18 @@ package jobs
 import (
 	"log"
 
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 	"github.com/robfig/cron/v3"
 )
 
 // Scheduler manages background jobs
 type Scheduler struct {
 	cron *cron.Cron
-	db   *sqlx.DB
+	db   *gorm.DB
 }
 
 // NewScheduler creates a new job scheduler
-func NewScheduler(db *sqlx.DB) *Scheduler {
+func NewScheduler(db *gorm.DB) *Scheduler {
 	return &Scheduler{
 		cron: cron.New(),
 		db:   db,
@@ -73,44 +73,41 @@ func (s *Scheduler) cleanupOldHeartbeats() {
 		AND time < datetime('now', '-90 days')
 	`
 
-	result, err := s.db.Exec(query)
-	if err != nil {
-		log.Printf("Failed to cleanup old heartbeats: %v", err)
+	result := s.db.Exec(query)
+	if result.Error != nil {
+		log.Printf("Failed to cleanup old heartbeats: %v", result.Error)
 		return
 	}
 
-	rows, _ := result.RowsAffected()
-	log.Printf("Cleaned up %d old heartbeats", rows)
+	log.Printf("Cleaned up %d old heartbeats", result.RowsAffected)
 }
 
 // cleanupOldStats removes aggregated stats older than 1 year
 func (s *Scheduler) cleanupOldStats() {
 	// Delete hourly stats older than 1 year
 	hourlyQuery := `DELETE FROM stat_hourly WHERE hour < datetime('now', '-365 days')`
-	result, err := s.db.Exec(hourlyQuery)
-	if err != nil {
-		log.Printf("Failed to cleanup old hourly stats: %v", err)
+	result := s.db.Exec(hourlyQuery)
+	if result.Error != nil {
+		log.Printf("Failed to cleanup old hourly stats: %v", result.Error)
 	} else {
-		rows, _ := result.RowsAffected()
-		log.Printf("Cleaned up %d old hourly stats", rows)
+		log.Printf("Cleaned up %d old hourly stats", result.RowsAffected)
 	}
 
 	// Delete daily stats older than 2 years
 	dailyQuery := `DELETE FROM stat_daily WHERE date < date('now', '-730 days')`
-	result, err = s.db.Exec(dailyQuery)
-	if err != nil {
-		log.Printf("Failed to cleanup old daily stats: %v", err)
+	result = s.db.Exec(dailyQuery)
+	if result.Error != nil {
+		log.Printf("Failed to cleanup old daily stats: %v", result.Error)
 	} else {
-		rows, _ := result.RowsAffected()
-		log.Printf("Cleaned up %d old daily stats", rows)
+		log.Printf("Cleaned up %d old daily stats", result.RowsAffected)
 	}
 }
 
 // vacuumDatabase runs VACUUM on SQLite database
 func (s *Scheduler) vacuumDatabase() {
-	_, err := s.db.Exec("VACUUM")
-	if err != nil {
-		log.Printf("Failed to vacuum database: %v", err)
+	result := s.db.Exec("VACUUM")
+	if result.Error != nil {
+		log.Printf("Failed to vacuum database: %v", result.Error)
 		return
 	}
 

@@ -2,8 +2,8 @@ services:
   # Backend API
   backend:
     build: .
-    image: uptime-kuma-go:latest
-    container_name: uptime-kuma-backend
+    image: uptime-kabomba-go:latest
+    container_name: uptime-kabomba-backend
     ports:
       - "8080:8080"
     volumes:
@@ -24,7 +24,7 @@ services:
   # Frontend Web UI
   frontend:
     image: node:20-alpine
-    container_name: uptime-kuma-frontend
+    container_name: uptime-kabomba-frontend
     working_dir: /app
     volumes:
       - ./web:/app

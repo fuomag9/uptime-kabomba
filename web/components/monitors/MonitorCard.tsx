@@ -1,29 +1,38 @@
 "use client";
 
-import { Monitor } from '@/lib/api';
+import { MonitorWithStatus } from '@/lib/api';
 import Link from 'next/link';
 import { useMonitorHeartbeat } from '@/hooks/useMonitorHeartbeats';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api';
 
 interface MonitorCardProps {
-  monitor: Monitor;
+  monitor: MonitorWithStatus;
   latestPing?: number;
   uptime?: number;
 }
 
 const STATUS_COLORS = {
-  0: { bg: 'bg-red-100 dark:bg-red-900/20', text: 'text-red-800 dark:text-red-200', label: 'Down' },
-  1: { bg: 'bg-green-100 dark:bg-green-900/20', text: 'text-green-800 dark:text-green-200', label: 'Up' },
-  2: { bg: 'bg-yellow-100 dark:bg-yellow-900/20', text: 'text-yellow-800 dark:text-yellow-200', label: 'Pending' },
-  3: { bg: 'bg-blue-100 dark:bg-blue-900/20', text: 'text-blue-800 dark:text-blue-200', label: 'Maintenance' },
+  0: { bg: 'bg-red-100 dark:bg-red-900/20', text: 'text-red-800 dark:text-red-200', label: 'Down', bar: 'bg-red-500' },
+  1: { bg: 'bg-green-100 dark:bg-green-900/20', text: 'text-green-800 dark:text-green-200', label: 'Up', bar: 'bg-green-500' },
+  2: { bg: 'bg-yellow-100 dark:bg-yellow-900/20', text: 'text-yellow-800 dark:text-yellow-200', label: 'Pending', bar: 'bg-yellow-500' },
+  3: { bg: 'bg-blue-100 dark:bg-blue-900/20', text: 'text-blue-800 dark:text-blue-200', label: 'Maintenance', bar: 'bg-blue-500' },
 };
 
 export default function MonitorCard({ monitor, latestPing, uptime }: MonitorCardProps) {
   // Get real-time heartbeat
   const heartbeat = useMonitorHeartbeat(monitor.id);
 
-  // Use real-time status if available, otherwise default to pending
-  const status = heartbeat?.status ?? 2;
-  const ping = heartbeat?.ping ?? latestPing;
+  // Fetch recent heartbeats for the bar chart
+  const { data: heartbeats = [] } = useQuery({
+    queryKey: ['heartbeats', monitor.id],
+    queryFn: () => apiClient.getHeartbeats(monitor.id, 50),
+    refetchInterval: 60000, // Refetch every minute
+  });
+
+  // Use real-time status if available, otherwise use last_heartbeat from API, otherwise default to pending
+  const status = heartbeat?.status ?? monitor.last_heartbeat?.status ?? 2;
+  const ping = heartbeat?.ping ?? monitor.last_heartbeat?.ping ?? latestPing;
   const statusStyle = STATUS_COLORS[status as keyof typeof STATUS_COLORS];
 
   return (
@@ -71,15 +80,29 @@ export default function MonitorCard({ monitor, latestPing, uptime }: MonitorCard
           </div>
         </div>
 
-        {/* Heartbeat bar (placeholder for now) */}
+        {/* Heartbeat bar */}
         <div className="mt-4 h-8 flex items-end gap-0.5">
-          {Array.from({ length: 50 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-sm"
-              style={{ height: '100%' }}
-            />
-          ))}
+          {heartbeats.length > 0 ? (
+            heartbeats.slice(0, 50).reverse().map((hb, i) => {
+              const hbStatusStyle = STATUS_COLORS[hb.status as keyof typeof STATUS_COLORS];
+              return (
+                <div
+                  key={hb.id || i}
+                  className={`flex-1 rounded-sm ${hbStatusStyle.bar}`}
+                  style={{ height: '100%' }}
+                  title={`${hbStatusStyle.label} - ${hb.ping}ms`}
+                />
+              );
+            })
+          ) : (
+            Array.from({ length: 50 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-sm"
+                style={{ height: '100%' }}
+              />
+            ))
+          )}
         </div>
       </div>
     </Link>

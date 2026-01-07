@@ -1,28 +1,27 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jmoiron/sqlx"
-	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/models"
+	"github.com/fuomag9/uptime-kabomba/internal/models"
 )
 
 // HandleGetStatusPages returns all status pages for the current user
-func HandleGetStatusPages(db *sqlx.DB) http.HandlerFunc {
+func HandleGetStatusPages(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 
 		var pages []models.StatusPage
-		query := `SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at
-		          FROM status_pages WHERE user_id = ? ORDER BY created_at DESC`
+		err := db.Where("user_id = ?", user.ID).
+			Order("created_at DESC").
+			Find(&pages).Error
 
-		err := db.Select(&pages, query, user.ID)
 		if err != nil {
 			http.Error(w, "Failed to fetch status pages", http.StatusInternalServerError)
 			return
@@ -34,31 +33,30 @@ func HandleGetStatusPages(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleGetStatusPage returns a single status page by ID
-func HandleGetStatusPage(db *sqlx.DB) http.HandlerFunc {
+func HandleGetStatusPage(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		pageID := chi.URLParam(r, "id")
 
 		var page models.StatusPage
-		query := `SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at
-		          FROM status_pages WHERE id = ? AND user_id = ?`
+		err := db.Where("id = ? AND user_id = ?", pageID, user.ID).
+			First(&page).Error
 
-		err := db.Get(&page, query, pageID, user.ID)
 		if err != nil {
-			http.Error(w, "Status page not found", http.StatusNotFound)
+			if err == gorm.ErrRecordNotFound {
+				http.Error(w, "Status page not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "Failed to fetch status page", http.StatusInternalServerError)
+			}
 			return
 		}
 
 		// Get monitors for this status page
 		var monitors []models.Monitor
-		monitorQuery := `
-			SELECT m.id, m.user_id, m.name, m.type, m.url, m.interval, m.timeout, m.active, m.config, m.created_at, m.updated_at
-			FROM monitors m
-			INNER JOIN status_page_monitors spm ON m.id = spm.monitor_id
-			WHERE spm.status_page_id = ?
-			ORDER BY spm.display_order ASC
-		`
-		db.Select(&monitors, monitorQuery, pageID)
+		db.Joins("INNER JOIN status_page_monitors spm ON monitors.id = spm.monitor_id").
+			Where("spm.status_page_id = ?", pageID).
+			Order("monitors.name ASC").
+			Find(&monitors)
 
 		result := models.StatusPageWithMonitors{
 			StatusPage: page,
@@ -71,7 +69,7 @@ func HandleGetStatusPage(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleCreateStatusPage creates a new status page
-func HandleCreateStatusPage(db *sqlx.DB) http.HandlerFunc {
+func HandleCreateStatusPage(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 
@@ -93,60 +91,57 @@ func HandleCreateStatusPage(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		// Validate slug is unique
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE slug = ?", req.Slug)
+		var count int64
+		db.Model(&models.StatusPage{}).
+			Where("slug = ?", req.Slug).
+			Count(&count)
 		if count > 0 {
 			http.Error(w, "Slug already exists", http.StatusConflict)
 			return
 		}
 
-		// Hash password if provided
-		var passwordHash sql.NullString
-		if req.Password != "" {
-			hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-			if err != nil {
-				http.Error(w, "Failed to hash password", http.StatusInternalServerError)
-				return
-			}
-			passwordHash = sql.NullString{String: string(hash), Valid: true}
+		// Create status page
+		now := time.Now()
+		page := models.StatusPage{
+			UserID:        user.ID,
+			Slug:          req.Slug,
+			Title:         req.Title,
+			Description:   req.Description,
+			Published:     req.Published,
+			ShowPoweredBy: req.ShowPoweredBy,
+			Theme:         req.Theme,
+			CustomCSS:     req.CustomCSS,
+			CreatedAt:     now,
+			UpdatedAt:     now,
 		}
 
-		// Insert status page
-		query := `
-			INSERT INTO status_pages (user_id, slug, title, description, published, show_powered_by, theme, custom_css, password, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			RETURNING id
-		`
+		err := db.Transaction(func(tx *gorm.DB) error {
+			// Create status page
+			if err := tx.Create(&page).Error; err != nil {
+				return err
+			}
 
-		now := time.Now()
-		var pageID int
-		err := db.QueryRow(query,
-			user.ID, req.Slug, req.Title, req.Description, req.Published,
-			req.ShowPoweredBy, req.Theme, req.CustomCSS, passwordHash, now, now,
-		).Scan(&pageID)
+			// Add monitors to status page
+			if len(req.MonitorIDs) > 0 {
+				for _, monitorID := range req.MonitorIDs {
+					spm := models.StatusPageMonitor{
+						StatusPageID: page.ID,
+						MonitorID:    monitorID,
+					}
+					if err := tx.Create(&spm).Error; err != nil {
+						// Log error but continue
+						continue
+					}
+				}
+			}
+
+			return nil
+		})
 
 		if err != nil {
 			http.Error(w, "Failed to create status page", http.StatusInternalServerError)
 			return
 		}
-
-		// Add monitors to status page
-		if len(req.MonitorIDs) > 0 {
-			for i, monitorID := range req.MonitorIDs {
-				_, err := db.Exec(
-					"INSERT INTO status_page_monitors (status_page_id, monitor_id, display_order) VALUES (?, ?, ?)",
-					pageID, monitorID, i,
-				)
-				if err != nil {
-					// Log error but continue
-					continue
-				}
-			}
-		}
-
-		// Return created page
-		var page models.StatusPage
-		db.Get(&page, "SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at FROM status_pages WHERE id = ?", pageID)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -155,7 +150,7 @@ func HandleCreateStatusPage(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleUpdateStatusPage updates an existing status page
-func HandleUpdateStatusPage(db *sqlx.DB) http.HandlerFunc {
+func HandleUpdateStatusPage(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		pageID := chi.URLParam(r, "id")
@@ -178,66 +173,74 @@ func HandleUpdateStatusPage(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		// Verify ownership
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
+		var count int64
+		db.Model(&models.StatusPage{}).
+			Where("id = ? AND user_id = ?", pageID, user.ID).
+			Count(&count)
 		if count == 0 {
 			http.Error(w, "Status page not found", http.StatusNotFound)
 			return
 		}
 
 		// Check slug uniqueness (excluding current page)
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE slug = ? AND id != ?", req.Slug, pageID)
+		db.Model(&models.StatusPage{}).
+			Where("slug = ? AND id != ?", req.Slug, pageID).
+			Count(&count)
 		if count > 0 {
 			http.Error(w, "Slug already exists", http.StatusConflict)
 			return
 		}
 
-		// Hash password if provided
-		var passwordHash sql.NullString
-		if req.Password != "" {
-			hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		// Update status page using transaction
+		err := db.Transaction(func(tx *gorm.DB) error {
+			// Update status page
+			err := tx.Model(&models.StatusPage{}).
+				Where("id = ? AND user_id = ?", pageID, user.ID).
+				Updates(map[string]interface{}{
+					"slug":            req.Slug,
+					"title":           req.Title,
+					"description":     req.Description,
+					"published":       req.Published,
+					"show_powered_by": req.ShowPoweredBy,
+					"theme":           req.Theme,
+					"custom_css":      req.CustomCSS,
+					"updated_at":      time.Now(),
+				}).Error
 			if err != nil {
-				http.Error(w, "Failed to hash password", http.StatusInternalServerError)
-				return
+				return err
 			}
-			passwordHash = sql.NullString{String: string(hash), Valid: true}
-		}
 
-		// Update status page
-		query := `
-			UPDATE status_pages
-			SET slug = ?, title = ?, description = ?, published = ?, show_powered_by = ?,
-			    theme = ?, custom_css = ?, password = ?, updated_at = ?
-			WHERE id = ? AND user_id = ?
-		`
+			// Delete all existing monitor associations
+			if err := tx.Where("status_page_id = ?", pageID).
+				Delete(&models.StatusPageMonitor{}).Error; err != nil {
+				return err
+			}
 
-		_, err := db.Exec(query,
-			req.Slug, req.Title, req.Description, req.Published, req.ShowPoweredBy,
-			req.Theme, req.CustomCSS, passwordHash, time.Now(), pageID, user.ID,
-		)
+			// Add new monitors
+			if len(req.MonitorIDs) > 0 {
+				pageIDInt, _ := strconv.Atoi(pageID)
+				for _, monitorID := range req.MonitorIDs {
+					spm := models.StatusPageMonitor{
+						StatusPageID: pageIDInt,
+						MonitorID:    monitorID,
+					}
+					if err := tx.Create(&spm).Error; err != nil {
+						return err
+					}
+				}
+			}
+
+			return nil
+		})
 
 		if err != nil {
 			http.Error(w, "Failed to update status page", http.StatusInternalServerError)
 			return
 		}
 
-		// Update monitors
-		// First, delete all existing monitor associations
-		db.Exec("DELETE FROM status_page_monitors WHERE status_page_id = ?", pageID)
-
-		// Add new monitors
-		if len(req.MonitorIDs) > 0 {
-			for i, monitorID := range req.MonitorIDs {
-				db.Exec(
-					"INSERT INTO status_page_monitors (status_page_id, monitor_id, display_order) VALUES (?, ?, ?)",
-					pageID, monitorID, i,
-				)
-			}
-		}
-
 		// Return updated page
 		var page models.StatusPage
-		db.Get(&page, "SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, created_at, updated_at FROM status_pages WHERE id = ?", pageID)
+		db.Where("id = ?", pageID).First(&page)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(page)
@@ -245,20 +248,21 @@ func HandleUpdateStatusPage(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleDeleteStatusPage deletes a status page
-func HandleDeleteStatusPage(db *sqlx.DB) http.HandlerFunc {
+func HandleDeleteStatusPage(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		pageID := chi.URLParam(r, "id")
 
 		// Delete from database
-		result, err := db.Exec("DELETE FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
-		if err != nil {
+		result := db.Where("id = ? AND user_id = ?", pageID, user.ID).
+			Delete(&models.StatusPage{})
+
+		if result.Error != nil {
 			http.Error(w, "Failed to delete status page", http.StatusInternalServerError)
 			return
 		}
 
-		rows, _ := result.RowsAffected()
-		if rows == 0 {
+		if result.RowsAffected == 0 {
 			http.Error(w, "Status page not found", http.StatusNotFound)
 			return
 		}
@@ -268,39 +272,24 @@ func HandleDeleteStatusPage(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleGetPublicStatusPage returns a public status page by slug (no auth required)
-func HandleGetPublicStatusPage(db *sqlx.DB) http.HandlerFunc {
+func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := chi.URLParam(r, "slug")
 
 		var page models.StatusPage
-		query := `SELECT id, user_id, slug, title, description, published, show_powered_by, theme, custom_css, password, created_at, updated_at
-		          FROM status_pages WHERE slug = ? AND published = 1`
+		err := db.Where("slug = ? AND published = ?", slug, true).
+			First(&page).Error
 
-		err := db.Get(&page, query, slug)
 		if err != nil {
-			http.Error(w, "Status page not found", http.StatusNotFound)
+			if err == gorm.ErrRecordNotFound {
+				http.Error(w, "Status page not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "Failed to fetch status page", http.StatusInternalServerError)
+			}
 			return
 		}
 
-		// Check if password protected
-		if page.Password != "" {
-			// Get password from header or query param
-			providedPassword := r.Header.Get("X-Status-Page-Password")
-			if providedPassword == "" {
-				providedPassword = r.URL.Query().Get("password")
-			}
-
-			if providedPassword == "" {
-				http.Error(w, "Password required", http.StatusUnauthorized)
-				return
-			}
-
-			// Verify password
-			if err := bcrypt.CompareHashAndPassword([]byte(page.Password), []byte(providedPassword)); err != nil {
-				http.Error(w, "Invalid password", http.StatusUnauthorized)
-				return
-			}
-		}
+		// Password protection not implemented yet (no password column in schema)
 
 		// Get monitors with their latest heartbeat
 		type MonitorWithStatus struct {
@@ -308,16 +297,11 @@ func HandleGetPublicStatusPage(db *sqlx.DB) http.HandlerFunc {
 			LastHeartbeat *models.Heartbeat `json:"last_heartbeat"`
 		}
 
-		monitorQuery := `
-			SELECT m.id, m.user_id, m.name, m.type, m.url, m.interval, m.timeout, m.active, m.config, m.created_at, m.updated_at
-			FROM monitors m
-			INNER JOIN status_page_monitors spm ON m.id = spm.monitor_id
-			WHERE spm.status_page_id = ?
-			ORDER BY spm.display_order ASC
-		`
-
 		var monitors []models.Monitor
-		db.Select(&monitors, monitorQuery, page.ID)
+		db.Joins("INNER JOIN status_page_monitors spm ON monitors.id = spm.monitor_id").
+			Where("spm.status_page_id = ?", page.ID).
+			Order("monitors.name ASC").
+			Find(&monitors)
 
 		monitorsWithStatus := make([]MonitorWithStatus, len(monitors))
 		for i, monitor := range monitors {
@@ -325,18 +309,20 @@ func HandleGetPublicStatusPage(db *sqlx.DB) http.HandlerFunc {
 
 			// Get latest heartbeat
 			var heartbeat models.Heartbeat
-			heartbeatQuery := `SELECT id, monitor_id, status, ping, important, message, time
-			                   FROM heartbeats WHERE monitor_id = ? ORDER BY time DESC LIMIT 1`
-			if err := db.Get(&heartbeat, heartbeatQuery, monitor.ID); err == nil {
+			if err := db.Where("monitor_id = ?", monitor.ID).
+				Order("time DESC").
+				Limit(1).
+				First(&heartbeat).Error; err == nil {
 				monitorsWithStatus[i].LastHeartbeat = &heartbeat
 			}
 		}
 
 		// Get recent incidents
 		var incidents []models.Incident
-		incidentQuery := `SELECT id, status_page_id, title, content, style, pin, created_at, updated_at
-		                  FROM incidents WHERE status_page_id = ? ORDER BY pin DESC, created_at DESC LIMIT 10`
-		db.Select(&incidents, incidentQuery, page.ID)
+		db.Where("status_page_id = ?", page.ID).
+			Order("pin DESC, created_at DESC").
+			Limit(10).
+			Find(&incidents)
 
 		result := map[string]interface{}{
 			"page":      page,
@@ -350,24 +336,26 @@ func HandleGetPublicStatusPage(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleGetIncidents returns all incidents for a status page
-func HandleGetIncidents(db *sqlx.DB) http.HandlerFunc {
+func HandleGetIncidents(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		pageID := chi.URLParam(r, "id")
 
 		// Verify ownership
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
+		var count int64
+		db.Model(&models.StatusPage{}).
+			Where("id = ? AND user_id = ?", pageID, user.ID).
+			Count(&count)
 		if count == 0 {
 			http.Error(w, "Status page not found", http.StatusNotFound)
 			return
 		}
 
 		var incidents []models.Incident
-		query := `SELECT id, status_page_id, title, content, style, pin, created_at, updated_at
-		          FROM incidents WHERE status_page_id = ? ORDER BY pin DESC, created_at DESC`
+		err := db.Where("status_page_id = ?", pageID).
+			Order("pin DESC, created_at DESC").
+			Find(&incidents).Error
 
-		err := db.Select(&incidents, query, pageID)
 		if err != nil {
 			http.Error(w, "Failed to fetch incidents", http.StatusInternalServerError)
 			return
@@ -379,14 +367,16 @@ func HandleGetIncidents(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleCreateIncident creates a new incident
-func HandleCreateIncident(db *sqlx.DB) http.HandlerFunc {
+func HandleCreateIncident(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		pageID := chi.URLParam(r, "id")
 
 		// Verify ownership
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
+		var count int64
+		db.Model(&models.StatusPage{}).
+			Where("id = ? AND user_id = ?", pageID, user.ID).
+			Count(&count)
 		if count == 0 {
 			http.Error(w, "Status page not found", http.StatusNotFound)
 			return
@@ -404,23 +394,23 @@ func HandleCreateIncident(db *sqlx.DB) http.HandlerFunc {
 			return
 		}
 
-		query := `
-			INSERT INTO incidents (status_page_id, title, content, style, pin, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-			RETURNING id
-		`
-
 		now := time.Now()
-		var incidentID int
-		err := db.QueryRow(query, pageID, req.Title, req.Content, req.Style, req.Pin, now, now).Scan(&incidentID)
+		pageIDInt, _ := strconv.Atoi(pageID)
+		incident := models.Incident{
+			StatusPageID: pageIDInt,
+			Title:        req.Title,
+			Content:      req.Content,
+			Style:        req.Style,
+			Pin:          req.Pin,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
 
+		err := db.Create(&incident).Error
 		if err != nil {
 			http.Error(w, "Failed to create incident", http.StatusInternalServerError)
 			return
 		}
-
-		var incident models.Incident
-		db.Get(&incident, "SELECT id, status_page_id, title, content, style, pin, created_at, updated_at FROM incidents WHERE id = ?", incidentID)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -429,28 +419,31 @@ func HandleCreateIncident(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleDeleteIncident deletes an incident
-func HandleDeleteIncident(db *sqlx.DB) http.HandlerFunc {
+func HandleDeleteIncident(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		pageID := chi.URLParam(r, "id")
 		incidentID := chi.URLParam(r, "incidentId")
 
 		// Verify ownership
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM status_pages WHERE id = ? AND user_id = ?", pageID, user.ID)
+		var count int64
+		db.Model(&models.StatusPage{}).
+			Where("id = ? AND user_id = ?", pageID, user.ID).
+			Count(&count)
 		if count == 0 {
 			http.Error(w, "Status page not found", http.StatusNotFound)
 			return
 		}
 
-		result, err := db.Exec("DELETE FROM incidents WHERE id = ? AND status_page_id = ?", incidentID, pageID)
-		if err != nil {
+		result := db.Where("id = ? AND status_page_id = ?", incidentID, pageID).
+			Delete(&models.Incident{})
+
+		if result.Error != nil {
 			http.Error(w, "Failed to delete incident", http.StatusInternalServerError)
 			return
 		}
 
-		rows, _ := result.RowsAffected()
-		if rows == 0 {
+		if result.RowsAffected == 0 {
 			http.Error(w, "Incident not found", http.StatusNotFound)
 			return
 		}

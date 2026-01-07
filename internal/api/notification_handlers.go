@@ -7,22 +7,22 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/models"
-	"github.com/fuomag9/uptime-kuma-go/internal/notification"
+	"github.com/fuomag9/uptime-kabomba/internal/models"
+	"github.com/fuomag9/uptime-kabomba/internal/notification"
 )
 
 // HandleGetNotifications returns all notifications for the current user
-func HandleGetNotificationsV2(db *sqlx.DB) http.HandlerFunc {
+func HandleGetNotificationsV2(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 
 		var notifications []models.Notification
-		query := `SELECT id, user_id, name, type, config, is_default, active, created_at, updated_at
-		          FROM notifications WHERE user_id = ? ORDER BY created_at DESC`
+		err := db.Where("user_id = ?", user.ID).
+			Order("created_at DESC").
+			Find(&notifications).Error
 
-		err := db.Select(&notifications, query, user.ID)
 		if err != nil {
 			http.Error(w, "Failed to fetch notifications", http.StatusInternalServerError)
 			return
@@ -34,18 +34,21 @@ func HandleGetNotificationsV2(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleGetNotification returns a single notification by ID
-func HandleGetNotification(db *sqlx.DB) http.HandlerFunc {
+func HandleGetNotification(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		notificationID := chi.URLParam(r, "id")
 
 		var notif models.Notification
-		query := `SELECT id, user_id, name, type, config, is_default, active, created_at, updated_at
-		          FROM notifications WHERE id = ? AND user_id = ?`
+		err := db.Where("id = ? AND user_id = ?", notificationID, user.ID).
+			First(&notif).Error
 
-		err := db.Get(&notif, query, notificationID, user.ID)
 		if err != nil {
-			http.Error(w, "Notification not found", http.StatusNotFound)
+			if err == gorm.ErrRecordNotFound {
+				http.Error(w, "Notification not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "Failed to fetch notification", http.StatusInternalServerError)
+			}
 			return
 		}
 
@@ -55,7 +58,7 @@ func HandleGetNotification(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleCreateNotification creates a new notification
-func HandleCreateNotification(db *sqlx.DB) http.HandlerFunc {
+func HandleCreateNotification(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 
@@ -92,28 +95,19 @@ func HandleCreateNotification(db *sqlx.DB) http.HandlerFunc {
 			return
 		}
 
-		// Insert into database
-		query := `
-			INSERT INTO notifications (user_id, name, type, config, is_default, active, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-			RETURNING id
-		`
+		// Create notification
+		notif := models.Notification{
+			UserID:    user.ID,
+			Name:      req.Name,
+			Type:      req.Type,
+			Config:    string(configJSON),
+			IsDefault: req.IsDefault,
+			Active:    true,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
 
-		var notif models.Notification
-		notif.UserID = user.ID
-		notif.Name = req.Name
-		notif.Type = req.Type
-		notif.Config = string(configJSON)
-		notif.IsDefault = req.IsDefault
-		notif.Active = true
-		notif.CreatedAt = time.Now()
-		notif.UpdatedAt = time.Now()
-
-		err = db.QueryRow(query,
-			notif.UserID, notif.Name, notif.Type, notif.Config,
-			notif.IsDefault, notif.Active, notif.CreatedAt, notif.UpdatedAt,
-		).Scan(&notif.ID)
-
+		err = db.Create(&notif).Error
 		if err != nil {
 			http.Error(w, "Failed to create notification", http.StatusInternalServerError)
 			return
@@ -126,7 +120,7 @@ func HandleCreateNotification(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleUpdateNotification updates an existing notification
-func HandleUpdateNotification(db *sqlx.DB) http.HandlerFunc {
+func HandleUpdateNotification(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		notificationID := chi.URLParam(r, "id")
@@ -152,8 +146,10 @@ func HandleUpdateNotification(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		// Verify ownership
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM notifications WHERE id = ? AND user_id = ?", id, user.ID)
+		var count int64
+		db.Model(&models.Notification{}).
+			Where("id = ? AND user_id = ?", id, user.ID).
+			Count(&count)
 		if count == 0 {
 			http.Error(w, "Notification not found", http.StatusNotFound)
 			return
@@ -180,15 +176,16 @@ func HandleUpdateNotification(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		// Update database
-		query := `
-			UPDATE notifications
-			SET name = ?, type = ?, config = ?, is_default = ?, active = ?, updated_at = ?
-			WHERE id = ? AND user_id = ?
-		`
-
-		_, err = db.Exec(query,
-			req.Name, req.Type, string(configJSON), req.IsDefault, req.Active, time.Now(), id, user.ID,
-		)
+		err = db.Model(&models.Notification{}).
+			Where("id = ? AND user_id = ?", id, user.ID).
+			Updates(map[string]interface{}{
+				"name":       req.Name,
+				"type":       req.Type,
+				"config":     string(configJSON),
+				"is_default": req.IsDefault,
+				"active":     req.Active,
+				"updated_at": time.Now(),
+			}).Error
 
 		if err != nil {
 			http.Error(w, "Failed to update notification", http.StatusInternalServerError)
@@ -197,7 +194,7 @@ func HandleUpdateNotification(db *sqlx.DB) http.HandlerFunc {
 
 		// Return updated notification
 		var notif models.Notification
-		db.Get(&notif, "SELECT id, user_id, name, type, config, is_default, active, created_at, updated_at FROM notifications WHERE id = ?", id)
+		db.Where("id = ?", id).First(&notif)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(notif)
@@ -205,7 +202,7 @@ func HandleUpdateNotification(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleDeleteNotification deletes a notification
-func HandleDeleteNotification(db *sqlx.DB) http.HandlerFunc {
+func HandleDeleteNotification(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		notificationID := chi.URLParam(r, "id")
@@ -218,15 +215,15 @@ func HandleDeleteNotification(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		// Delete from database
-		query := `DELETE FROM notifications WHERE id = ? AND user_id = ?`
-		result, err := db.Exec(query, id, user.ID)
-		if err != nil {
+		result := db.Where("id = ? AND user_id = ?", id, user.ID).
+			Delete(&models.Notification{})
+
+		if result.Error != nil {
 			http.Error(w, "Failed to delete notification", http.StatusInternalServerError)
 			return
 		}
 
-		rows, _ := result.RowsAffected()
-		if rows == 0 {
+		if result.RowsAffected == 0 {
 			http.Error(w, "Notification not found", http.StatusNotFound)
 			return
 		}
@@ -236,19 +233,22 @@ func HandleDeleteNotification(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleTestNotification sends a test notification
-func HandleTestNotification(db *sqlx.DB, dispatcher *notification.Dispatcher) http.HandlerFunc {
+func HandleTestNotification(db *gorm.DB, dispatcher *notification.Dispatcher) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		notificationID := chi.URLParam(r, "id")
 
 		// Get notification
 		var notif notification.Notification
-		query := `SELECT id, user_id, name, type, config, is_default, active, created_at, updated_at
-		          FROM notifications WHERE id = ? AND user_id = ?`
+		err := db.Where("id = ? AND user_id = ?", notificationID, user.ID).
+			First(&notif).Error
 
-		err := db.Get(&notif, query, notificationID, user.ID)
 		if err != nil {
-			http.Error(w, "Notification not found", http.StatusNotFound)
+			if err == gorm.ErrRecordNotFound {
+				http.Error(w, "Notification not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "Failed to fetch notification", http.StatusInternalServerError)
+			}
 			return
 		}
 

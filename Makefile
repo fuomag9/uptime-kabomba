@@ -27,14 +27,14 @@ dev-frontend: ## Run Next.js frontend in development mode
 
 build: ## Build production binaries
 	@echo "Building Go backend..."
-	go build -o uptime-kuma-go cmd/server/main.go
+	go build -o uptime-kabomba-go cmd/server/main.go
 	@echo "Building Next.js frontend..."
 	cd web && npm run build
 	@echo "Build complete!"
 
 clean: ## Clean build artifacts and data
 	@echo "Cleaning build artifacts..."
-	rm -f uptime-kuma-go
+	rm -f uptime-kabomba-go
 	rm -rf web/.next web/out web/build
 	rm -rf data/*.db data/*.db-shm data/*.db-wal
 	@echo "Clean complete!"
@@ -61,7 +61,7 @@ docker-down: ## Stop Docker development environment
 	docker-compose down
 
 docker-build: ## Build Docker image
-	docker build -t uptime-kuma-go:latest .
+	docker build -t uptime-kabomba-go:latest .
 
 run: ## Run production build
-	./uptime-kuma-go
+	./uptime-kabomba-go

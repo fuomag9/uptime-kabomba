@@ -10,13 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/api"
-	"github.com/fuomag9/uptime-kuma-go/internal/config"
-	"github.com/fuomag9/uptime-kuma-go/internal/database"
-	"github.com/fuomag9/uptime-kuma-go/internal/jobs"
-	"github.com/fuomag9/uptime-kuma-go/internal/monitor"
-	"github.com/fuomag9/uptime-kuma-go/internal/notification"
-	"github.com/fuomag9/uptime-kuma-go/internal/websocket"
+	"github.com/fuomag9/uptime-kabomba/internal/api"
+	"github.com/fuomag9/uptime-kabomba/internal/config"
+	"github.com/fuomag9/uptime-kabomba/internal/database"
+	"github.com/fuomag9/uptime-kabomba/internal/jobs"
+	"github.com/fuomag9/uptime-kabomba/internal/monitor"
+	"github.com/fuomag9/uptime-kabomba/internal/notification"
+	"github.com/fuomag9/uptime-kabomba/internal/websocket"
 )
 
 func main() {
@@ -28,7 +28,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+
+	// Get underlying SQL database for cleanup
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("Failed to get database connection: %v", err)
+	}
+	defer sqlDB.Close()
 
 	// Run migrations
 	if err := database.RunMigrations(cfg.Database); err != nil {

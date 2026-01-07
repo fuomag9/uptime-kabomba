@@ -7,16 +7,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 )
 
 // Dispatcher handles sending notifications
 type Dispatcher struct {
-	db *sqlx.DB
+	db *gorm.DB
 }
 
 // NewDispatcher creates a new notification dispatcher
-func NewDispatcher(db *sqlx.DB) *Dispatcher {
+func NewDispatcher(db *gorm.DB) *Dispatcher {
 	return &Dispatcher{db: db}
 }
 
@@ -116,7 +116,7 @@ func (d *Dispatcher) getMonitorNotifications(monitorID int) ([]*Notification, er
 	`
 
 	var notifications []*Notification
-	err := d.db.Select(&notifications, query, monitorID)
+	err := d.db.Raw(query, monitorID).Scan(&notifications).Error
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (d *Dispatcher) getDefaultNotifications() ([]*Notification, error) {
 	`
 
 	var notifications []*Notification
-	err := d.db.Select(&notifications, query)
+	err := d.db.Raw(query).Scan(&notifications).Error
 	if err != nil {
 		return nil, err
 	}

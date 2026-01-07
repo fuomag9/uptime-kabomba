@@ -7,21 +7,23 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/models"
-	"github.com/fuomag9/uptime-kuma-go/internal/uptime"
+	"github.com/fuomag9/uptime-kabomba/internal/models"
+	"github.com/fuomag9/uptime-kabomba/internal/uptime"
 )
 
 // HandleGetMonitorUptime returns uptime statistics for a monitor
-func HandleGetMonitorUptime(db *sqlx.DB) http.HandlerFunc {
+func HandleGetMonitorUptime(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		monitorID := chi.URLParam(r, "id")
 
 		// Verify ownership
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ? AND user_id = ?", monitorID, user.ID)
+		var count int64
+		db.Model(&models.Monitor{}).
+			Where("id = ? AND user_id = ?", monitorID, user.ID).
+			Count(&count)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -58,14 +60,16 @@ func HandleGetMonitorUptime(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleGetMonitorUptimeHistory returns daily uptime history for a monitor
-func HandleGetMonitorUptimeHistory(db *sqlx.DB) http.HandlerFunc {
+func HandleGetMonitorUptimeHistory(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		monitorID := chi.URLParam(r, "id")
 
 		// Verify ownership
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ? AND user_id = ?", monitorID, user.ID)
+		var count int64
+		db.Model(&models.Monitor{}).
+			Where("id = ? AND user_id = ?", monitorID, user.ID).
+			Count(&count)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -95,14 +99,16 @@ func HandleGetMonitorUptimeHistory(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleGetMonitorHourlyUptime returns hourly uptime for the last 24 hours
-func HandleGetMonitorHourlyUptime(db *sqlx.DB) http.HandlerFunc {
+func HandleGetMonitorHourlyUptime(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		monitorID := chi.URLParam(r, "id")
 
 		// Verify ownership
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ? AND user_id = ?", monitorID, user.ID)
+		var count int64
+		db.Model(&models.Monitor{}).
+			Where("id = ? AND user_id = ?", monitorID, user.ID).
+			Count(&count)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -123,7 +129,7 @@ func HandleGetMonitorHourlyUptime(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleGetAllMonitorsUptime returns uptime for all monitors
-func HandleGetAllMonitorsUptime(db *sqlx.DB) http.HandlerFunc {
+func HandleGetAllMonitorsUptime(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 
@@ -152,8 +158,14 @@ func HandleGetAllMonitorsUptime(db *sqlx.DB) http.HandlerFunc {
 
 		// Filter by user's monitors
 		var monitorIDs []int
-		query := `SELECT id FROM monitors WHERE user_id = ? AND active = 1`
-		db.Select(&monitorIDs, query, user.ID)
+		var monitors []models.Monitor
+		db.Where("user_id = ? AND active = ?", user.ID, true).
+			Select("id").
+			Find(&monitors)
+
+		for _, m := range monitors {
+			monitorIDs = append(monitorIDs, m.ID)
+		}
 
 		userStats := make(map[int]*uptime.UptimeStats)
 		for _, id := range monitorIDs {

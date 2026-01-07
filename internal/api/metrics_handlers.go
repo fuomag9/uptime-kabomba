@@ -5,29 +5,31 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/uptime"
+	"github.com/fuomag9/uptime-kabomba/internal/models"
+	"github.com/fuomag9/uptime-kabomba/internal/uptime"
 )
 
 // HandlePrometheusMetrics exports metrics in Prometheus format
-func HandlePrometheusMetrics(db *sqlx.DB) http.HandlerFunc {
+func HandlePrometheusMetrics(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Set content type for Prometheus
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 
 		// Get all monitors
 		var monitors []struct {
-			ID       int    `db:"id"`
-			Name     string `db:"name"`
-			Type     string `db:"type"`
-			URL      string `db:"url"`
-			Active   bool   `db:"active"`
-			UserID   int    `db:"user_id"`
+			ID       int    `gorm:"column:id"`
+			Name     string `gorm:"column:name"`
+			Type     string `gorm:"column:type"`
+			URL      string `gorm:"column:url"`
+			Active   bool   `gorm:"column:active"`
+			UserID   int    `gorm:"column:user_id"`
 		}
 
-		query := `SELECT id, name, type, url, active, user_id FROM monitors`
-		if err := db.Select(&monitors, query); err != nil {
+		if err := db.Model(&models.Monitor{}).
+			Select("id, name, type, url, active, user_id").
+			Find(&monitors).Error; err != nil {
 			http.Error(w, "Failed to fetch monitors", http.StatusInternalServerError)
 			return
 		}
@@ -56,12 +58,12 @@ func HandlePrometheusMetrics(db *sqlx.DB) http.HandlerFunc {
 				monitor.ID, monitor.Name, monitor.Type, monitor.UserID)
 
 			// Get latest heartbeat
-			var heartbeat struct {
-				Status int `db:"status"`
-				Ping   int `db:"ping"`
-			}
-			hbQuery := `SELECT status, ping FROM heartbeats WHERE monitor_id = ? ORDER BY time DESC LIMIT 1`
-			if err := db.Get(&heartbeat, hbQuery, monitor.ID); err == nil {
+			var heartbeat models.Heartbeat
+			err := db.Where("monitor_id = ?", monitor.ID).
+				Order("time DESC").
+				Limit(1).
+				First(&heartbeat).Error
+			if err == nil {
 				// Monitor status
 				status := 0
 				if heartbeat.Status == 1 {
@@ -109,16 +111,16 @@ func HandlePrometheusMetrics(db *sqlx.DB) http.HandlerFunc {
 		fmt.Fprintf(w, "uptime_system_active_monitors %d\n", activeCount)
 
 		// Heartbeat count (total in database)
-		var totalHeartbeats int
-		db.Get(&totalHeartbeats, "SELECT COUNT(*) FROM heartbeats")
+		var totalHeartbeats int64
+		db.Model(&models.Heartbeat{}).Count(&totalHeartbeats)
 		fmt.Fprintln(w, "# HELP uptime_system_total_heartbeats Total heartbeats recorded")
 		fmt.Fprintln(w, "# TYPE uptime_system_total_heartbeats counter")
 		fmt.Fprintf(w, "uptime_system_total_heartbeats %d\n", totalHeartbeats)
 
 		// Database size (SQLite specific)
 		var pageCount, pageSize int
-		db.Get(&pageCount, "PRAGMA page_count")
-		db.Get(&pageSize, "PRAGMA page_size")
+		db.Raw("PRAGMA page_count").Scan(&pageCount)
+		db.Raw("PRAGMA page_size").Scan(&pageSize)
 		dbSize := pageCount * pageSize
 		fmt.Fprintln(w, "# HELP uptime_system_database_size_bytes Database size in bytes")
 		fmt.Fprintln(w, "# TYPE uptime_system_database_size_bytes gauge")

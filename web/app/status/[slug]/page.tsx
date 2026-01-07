@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { apiClient, PublicStatusPage } from '@/lib/api';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function PublicStatusPageComponent() {
   const params = useParams();
@@ -147,6 +148,10 @@ export default function PublicStatusPageComponent() {
     <div className={`min-h-screen ${bgClass} ${textClass}`}>
       <style dangerouslySetInnerHTML={{ __html: data.page.custom_css || '' }} />
 
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
+
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12">
@@ -236,7 +241,7 @@ export default function PublicStatusPageComponent() {
         {/* Footer */}
         {data.page.show_powered_by && (
           <div className={`mt-12 text-center text-sm ${mutedTextClass}`}>
-            Powered by <a href="https://github.com/louislam/uptime-kuma" className="underline hover:no-underline">Uptime Kuma</a>
+            Powered by <a href="https://github.com/fuomag9/uptime-kabomba" className="underline hover:no-underline">Uptime Kabomba</a>
           </div>
         )}
 

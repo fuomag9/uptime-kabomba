@@ -3,16 +3,18 @@ package uptime
 import (
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
+
+	"github.com/fuomag9/uptime-kabomba/internal/models"
 )
 
 // Calculator calculates uptime statistics for monitors
 type Calculator struct {
-	db *sqlx.DB
+	db *gorm.DB
 }
 
 // NewCalculator creates a new uptime calculator
-func NewCalculator(db *sqlx.DB) *Calculator {
+func NewCalculator(db *gorm.DB) *Calculator {
 	return &Calculator{db: db}
 }
 
@@ -64,13 +66,13 @@ func (c *Calculator) CalculateUptimeForPeriod(monitorID int, duration time.Durat
 	`
 
 	var stats struct {
-		TotalChecks int     `db:"total_checks"`
-		UpChecks    int     `db:"up_checks"`
-		DownChecks  int     `db:"down_checks"`
-		AveragePing float64 `db:"average_ping"`
+		TotalChecks int     `gorm:"column:total_checks"`
+		UpChecks    int     `gorm:"column:up_checks"`
+		DownChecks  int     `gorm:"column:down_checks"`
+		AveragePing float64 `gorm:"column:average_ping"`
 	}
 
-	err := c.db.Get(&stats, query, monitorID, startTime, endTime)
+	err := c.db.Raw(query, monitorID, startTime, endTime).Scan(&stats).Error
 	if err != nil {
 		return nil, err
 	}
@@ -106,13 +108,13 @@ func (c *Calculator) CalculateUptimeForTimeRange(monitorID int, startTime, endTi
 	`
 
 	var stats struct {
-		TotalChecks int     `db:"total_checks"`
-		UpChecks    int     `db:"up_checks"`
-		DownChecks  int     `db:"down_checks"`
-		AveragePing float64 `db:"average_ping"`
+		TotalChecks int     `gorm:"column:total_checks"`
+		UpChecks    int     `gorm:"column:up_checks"`
+		DownChecks  int     `gorm:"column:down_checks"`
+		AveragePing float64 `gorm:"column:average_ping"`
 	}
 
-	err := c.db.Get(&stats, query, monitorID, startTime, endTime)
+	err := c.db.Raw(query, monitorID, startTime, endTime).Scan(&stats).Error
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +139,17 @@ func (c *Calculator) CalculateUptimeForTimeRange(monitorID int, startTime, endTi
 // GetUptimeForAllMonitors calculates uptime for all active monitors
 func (c *Calculator) GetUptimeForAllMonitors(duration time.Duration) (map[int]*UptimeStats, error) {
 	// Get all active monitor IDs
-	var monitorIDs []int
-	query := `SELECT id FROM monitors WHERE active = 1`
-	err := c.db.Select(&monitorIDs, query)
+	var monitors []models.Monitor
+	err := c.db.Where("active = ?", true).
+		Select("id").
+		Find(&monitors).Error
 	if err != nil {
 		return nil, err
+	}
+
+	var monitorIDs []int
+	for _, m := range monitors {
+		monitorIDs = append(monitorIDs, m.ID)
 	}
 
 	results := make(map[int]*UptimeStats)
@@ -181,7 +189,7 @@ func (c *Calculator) GetDailyUptimeHistory(monitorID int, days int) ([]DailyUpti
 		ORDER BY date ASC
 	`
 
-	rows, err := c.db.Query(query, monitorID, startTime, endTime)
+	rows, err := c.db.Raw(query, monitorID, startTime, endTime).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +245,7 @@ func (c *Calculator) GetHourlyUptimeHistory(monitorID int) ([]HourlyUptimePoint,
 		ORDER BY hour ASC
 	`
 
-	rows, err := c.db.Query(query, monitorID, startTime, endTime)
+	rows, err := c.db.Raw(query, monitorID, startTime, endTime).Rows()
 	if err != nil {
 		return nil, err
 	}

@@ -10,8 +10,10 @@ export function useWebSocket() {
   useEffect(() => {
     const token = apiClient.getToken();
 
-    // Connect to WebSocket
-    wsClient.connect(token || undefined);
+    // Connect to WebSocket if not already connected
+    if (!wsClient.isConnected()) {
+      wsClient.connect(token || undefined);
+    }
 
     // Setup event listeners
     const handleConnected = () => setConnected(true);
@@ -20,11 +22,16 @@ export function useWebSocket() {
     wsClient.on('connected', handleConnected);
     wsClient.on('disconnected', handleDisconnected);
 
-    // Cleanup on unmount
+    // Update connected state if already connected
+    if (wsClient.isConnected()) {
+      setConnected(true);
+    }
+
+    // Cleanup on unmount - only remove listeners, keep connection alive
     return () => {
       wsClient.off('connected', handleConnected);
       wsClient.off('disconnected', handleDisconnected);
-      wsClient.disconnect();
+      // Don't disconnect - WebSocket should stay alive across navigation
     };
   }, []);
 

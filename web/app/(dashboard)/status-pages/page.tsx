@@ -20,7 +20,7 @@ export default function StatusPagesPage() {
       setLoading(true);
       setError(null);
       const pages = await apiClient.getStatusPages();
-      setStatusPages(pages);
+      setStatusPages(pages || []);
     } catch (err: any) {
       console.error('Failed to load status pages:', err);
       setError(err.message || 'Failed to load status pages');
@@ -39,7 +39,7 @@ export default function StatusPagesPage() {
 
     try {
       await apiClient.deleteStatusPage(id);
-      setStatusPages(statusPages.filter((p) => p.id !== id));
+      setStatusPages((statusPages || []).filter((p) => p.id !== id));
     } catch (err: any) {
       console.error('Failed to delete status page:', err);
       alert('Failed to delete status page: ' + (err.message || 'Unknown error'));
@@ -79,7 +79,7 @@ export default function StatusPagesPage() {
         </Link>
       </div>
 
-      {statusPages.length === 0 ? (
+      {(!statusPages || statusPages.length === 0) ? (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
           <p className="text-gray-600">No status pages created yet.</p>
           <Link
@@ -91,7 +91,7 @@ export default function StatusPagesPage() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {statusPages.map((page) => (
+          {(statusPages || []).map((page) => (
             <div
               key={page.id}
               className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"

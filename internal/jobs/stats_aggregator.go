@@ -4,16 +4,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 )
 
 // StatsAggregator aggregates heartbeat data into hourly and daily statistics
 type StatsAggregator struct {
-	db *sqlx.DB
+	db *gorm.DB
 }
 
 // NewStatsAggregator creates a new statistics aggregator
-func NewStatsAggregator(db *sqlx.DB) *StatsAggregator {
+func NewStatsAggregator(db *gorm.DB) *StatsAggregator {
 	return &StatsAggregator{db: db}
 }
 
@@ -23,7 +23,7 @@ func (a *StatsAggregator) AggregateHourly() error {
 
 	// Get all monitors
 	var monitorIDs []int
-	err := a.db.Select(&monitorIDs, "SELECT id FROM monitors")
+	err := a.db.Raw("SELECT id FROM monitors").Scan(&monitorIDs).Error
 	if err != nil {
 		return err
 	}
@@ -60,15 +60,15 @@ func (a *StatsAggregator) aggregateMonitorHourly(monitorID int, hourStart, hourE
 	`
 
 	var stats struct {
-		PingMin    *int    `db:"ping_min"`
-		PingMax    *int    `db:"ping_max"`
-		PingAvg    *float64 `db:"ping_avg"`
-		UpCount    int     `db:"up_count"`
-		DownCount  int     `db:"down_count"`
-		TotalCount int     `db:"total_count"`
+		PingMin    *int    `gorm:"column:ping_min"`
+		PingMax    *int    `gorm:"column:ping_max"`
+		PingAvg    *float64 `gorm:"column:ping_avg"`
+		UpCount    int     `gorm:"column:up_count"`
+		DownCount  int     `gorm:"column:down_count"`
+		TotalCount int     `gorm:"column:total_count"`
 	}
 
-	err := a.db.Get(&stats, query, monitorID, hourStart, hourEnd)
+	err := a.db.Raw(query, monitorID, hourStart, hourEnd).Scan(&stats).Error
 	if err != nil {
 		return err
 	}
@@ -111,10 +111,10 @@ func (a *StatsAggregator) aggregateMonitorHourly(monitorID int, hourStart, hourE
 		pingAvg = *stats.PingAvg
 	}
 
-	_, err = a.db.Exec(upsertQuery,
+	err = a.db.Exec(upsertQuery,
 		monitorID, hourStart, pingMin, pingMax, pingAvg,
 		stats.UpCount, stats.DownCount, stats.TotalCount, uptimePercentage, time.Now(),
-	)
+	).Error
 
 	return err
 }
@@ -125,7 +125,7 @@ func (a *StatsAggregator) AggregateDaily() error {
 
 	// Get all monitors
 	var monitorIDs []int
-	err := a.db.Select(&monitorIDs, "SELECT id FROM monitors")
+	err := a.db.Raw("SELECT id FROM monitors").Scan(&monitorIDs).Error
 	if err != nil {
 		return err
 	}
@@ -162,15 +162,15 @@ func (a *StatsAggregator) aggregateMonitorDaily(monitorID int, dayStart, dayEnd 
 	`
 
 	var stats struct {
-		PingMin    *int    `db:"ping_min"`
-		PingMax    *int    `db:"ping_max"`
-		PingAvg    *float64 `db:"ping_avg"`
-		UpCount    int     `db:"up_count"`
-		DownCount  int     `db:"down_count"`
-		TotalCount int     `db:"total_count"`
+		PingMin    *int    `gorm:"column:ping_min"`
+		PingMax    *int    `gorm:"column:ping_max"`
+		PingAvg    *float64 `gorm:"column:ping_avg"`
+		UpCount    int     `gorm:"column:up_count"`
+		DownCount  int     `gorm:"column:down_count"`
+		TotalCount int     `gorm:"column:total_count"`
 	}
 
-	err := a.db.Get(&stats, query, monitorID, dayStart, dayEnd)
+	err := a.db.Raw(query, monitorID, dayStart, dayEnd).Scan(&stats).Error
 	if err != nil {
 		return err
 	}
@@ -213,10 +213,10 @@ func (a *StatsAggregator) aggregateMonitorDaily(monitorID int, dayStart, dayEnd 
 		pingAvg = *stats.PingAvg
 	}
 
-	_, err = a.db.Exec(upsertQuery,
+	err = a.db.Exec(upsertQuery,
 		monitorID, dayStart.Format("2006-01-02"), pingMin, pingMax, pingAvg,
 		stats.UpCount, stats.DownCount, stats.TotalCount, uptimePercentage, time.Now(),
-	)
+	).Error
 
 	return err
 }

@@ -109,6 +109,16 @@ export default function MonitorDetailPage() {
     uptime = (upCount / heartbeats.length) * 100;
   }
 
+  // Calculate average ping
+  let avgPing = 0;
+  if (heartbeats && heartbeats.length > 0) {
+    const validPings = heartbeats.filter(h => h.ping > 0);
+    if (validPings.length > 0) {
+      const totalPing = validPings.reduce((sum, h) => sum + h.ping, 0);
+      avgPing = totalPing / validPings.length;
+    }
+  }
+
   return (
     <div>
       {/* Header */}
@@ -173,7 +183,7 @@ export default function MonitorDetailPage() {
         <div className="overflow-hidden rounded-lg bg-white dark:bg-gray-800 px-4 py-5 shadow sm:p-6">
           <dt className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">Average Ping</dt>
           <dd className="mt-1 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
-            {latestHeartbeat ? `${latestHeartbeat.ping}ms` : '--'}
+            {avgPing > 0 ? `${avgPing.toFixed(0)}ms` : '--'}
           </dd>
         </div>
         <div className="overflow-hidden rounded-lg bg-white dark:bg-gray-800 px-4 py-5 shadow sm:p-6">

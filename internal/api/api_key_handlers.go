@@ -9,31 +9,28 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/models"
+	"github.com/fuomag9/uptime-kabomba/internal/models"
 )
 
 // HandleGetAPIKeys returns all API keys for the current user
-func HandleGetAPIKeys(db *sqlx.DB) http.HandlerFunc {
+func HandleGetAPIKeys(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 
 		var apiKeys []models.APIKey
-		query := `SELECT id, user_id, name, key_hash, prefix, scopes, expires_at, last_used_at, created_at
-		          FROM api_keys WHERE user_id = ? ORDER BY created_at DESC`
+		err := db.Where("user_id = ?", user.ID).
+			Order("created_at DESC").
+			Find(&apiKeys).Error
 
-		err := db.Select(&apiKeys, query, user.ID)
 		if err != nil {
 			http.Error(w, "Failed to fetch API keys", http.StatusInternalServerError)
 			return
 		}
 
-		// Parse scopes for each key
-		for i := range apiKeys {
-			apiKeys[i].AfterLoad()
-		}
+		// AfterFind hook automatically unmarshals Scopes JSON
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(apiKeys)
@@ -41,7 +38,7 @@ func HandleGetAPIKeys(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleCreateAPIKey creates a new API key
-func HandleCreateAPIKey(db *sqlx.DB) http.HandlerFunc {
+func HandleCreateAPIKey(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 
@@ -104,22 +101,19 @@ func HandleCreateAPIKey(db *sqlx.DB) http.HandlerFunc {
 			expiresAt = &t
 		}
 
-		// Marshal scopes
-		scopesJSON, err := json.Marshal(req.Scopes)
-		if err != nil {
-			http.Error(w, "Failed to marshal scopes", http.StatusInternalServerError)
-			return
+		// Create API key model
+		newKey := models.APIKey{
+			UserID:    user.ID,
+			Name:      req.Name,
+			KeyHash:   string(keyHash),
+			Prefix:    prefix,
+			Scopes:    req.Scopes,
+			ExpiresAt: expiresAt,
+			CreatedAt: time.Now(),
 		}
 
-		// Insert into database
-		query := `
-			INSERT INTO api_keys (user_id, name, key_hash, prefix, scopes, expires_at, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-			RETURNING id
-		`
-
-		var keyID int
-		err = db.QueryRow(query, user.ID, req.Name, string(keyHash), prefix, string(scopesJSON), expiresAt, time.Now()).Scan(&keyID)
+		// BeforeSave hook will automatically marshal Scopes to ScopesRaw
+		err = db.Create(&newKey).Error
 		if err != nil {
 			http.Error(w, "Failed to create API key", http.StatusInternalServerError)
 			return
@@ -127,13 +121,13 @@ func HandleCreateAPIKey(db *sqlx.DB) http.HandlerFunc {
 
 		// Return the key ONLY ONCE (never stored in plain text)
 		response := map[string]interface{}{
-			"id":         keyID,
-			"name":       req.Name,
-			"prefix":     prefix,
+			"id":         newKey.ID,
+			"name":       newKey.Name,
+			"prefix":     newKey.Prefix,
 			"key":        apiKey, // ONLY sent once
 			"scopes":     req.Scopes,
 			"expires_at": expiresAt,
-			"created_at": time.Now(),
+			"created_at": newKey.CreatedAt,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -143,20 +137,21 @@ func HandleCreateAPIKey(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleDeleteAPIKey deletes an API key
-func HandleDeleteAPIKey(db *sqlx.DB) http.HandlerFunc {
+func HandleDeleteAPIKey(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		keyID := chi.URLParam(r, "id")
 
 		// Delete from database
-		result, err := db.Exec("DELETE FROM api_keys WHERE id = ? AND user_id = ?", keyID, user.ID)
-		if err != nil {
+		result := db.Where("id = ? AND user_id = ?", keyID, user.ID).
+			Delete(&models.APIKey{})
+
+		if result.Error != nil {
 			http.Error(w, "Failed to delete API key", http.StatusInternalServerError)
 			return
 		}
 
-		rows, _ := result.RowsAffected()
-		if rows == 0 {
+		if result.RowsAffected == 0 {
 			http.Error(w, "API key not found", http.StatusNotFound)
 			return
 		}
@@ -166,7 +161,7 @@ func HandleDeleteAPIKey(db *sqlx.DB) http.HandlerFunc {
 }
 
 // APIKeyAuthMiddleware authenticates requests using API keys
-func APIKeyAuthMiddleware(db *sqlx.DB) func(http.Handler) http.Handler {
+func APIKeyAuthMiddleware(db *gorm.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Get API key from header
@@ -186,8 +181,7 @@ func APIKeyAuthMiddleware(db *sqlx.DB) func(http.Handler) http.Handler {
 
 			// Get all API keys (we need to hash check each one)
 			var apiKeys []models.APIKey
-			query := `SELECT id, user_id, name, key_hash, prefix, scopes, expires_at, last_used_at, created_at FROM api_keys`
-			err := db.Select(&apiKeys, query)
+			err := db.Find(&apiKeys).Error
 			if err != nil {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
@@ -213,16 +207,18 @@ func APIKeyAuthMiddleware(db *sqlx.DB) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Parse scopes
-			matchedKey.AfterLoad()
+			// AfterFind hook automatically unmarshals Scopes
 
 			// Update last_used_at
-			db.Exec("UPDATE api_keys SET last_used_at = ? WHERE id = ?", time.Now(), matchedKey.ID)
+			now := time.Now()
+			db.Model(&models.APIKey{}).
+				Where("id = ?", matchedKey.ID).
+				Update("last_used_at", now)
 
 			// Get user
 			var user models.User
-			userQuery := `SELECT id, username, active, created_at FROM users WHERE id = ?`
-			err = db.Get(&user, userQuery, matchedKey.UserID)
+			err = db.Where("id = ?", matchedKey.UserID).
+				First(&user).Error
 			if err != nil {
 				http.Error(w, "User not found", http.StatusUnauthorized)
 				return

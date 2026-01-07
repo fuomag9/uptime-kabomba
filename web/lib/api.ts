@@ -72,6 +72,11 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // Clear token on authentication errors
+      if (response.status === 401) {
+        this.setToken(null);
+      }
+
       const error: ApiError = {
         message: await response.text(),
         status: response.status,
@@ -79,7 +84,13 @@ class ApiClient {
       throw error;
     }
 
-    return response.json();
+    // Handle empty responses
+    const text = await response.text();
+    if (!text || text === 'null') {
+      return null as T;
+    }
+
+    return JSON.parse(text);
   }
 
   // Auth endpoints
@@ -113,8 +124,9 @@ class ApiClient {
   }
 
   // Monitor endpoints
-  async getMonitors(): Promise<Monitor[]> {
-    return this.request<Monitor[]>('/api/monitors');
+  async getMonitors(): Promise<MonitorWithStatus[]> {
+    const result = await this.request<MonitorWithStatus[] | null>('/api/monitors');
+    return result || [];
   }
 
   async getMonitor(id: number): Promise<Monitor> {
@@ -143,12 +155,14 @@ class ApiClient {
 
   async getHeartbeats(monitorId: number, limit?: number): Promise<Heartbeat[]> {
     const params = limit ? `?limit=${limit}` : '';
-    return this.request<Heartbeat[]>(`/api/monitors/${monitorId}/heartbeats${params}`);
+    const result = await this.request<Heartbeat[] | null>(`/api/monitors/${monitorId}/heartbeats${params}`);
+    return result || [];
   }
 
   // Notification endpoints
   async getNotifications(): Promise<Notification[]> {
-    return this.request<Notification[]>('/api/notifications');
+    const result = await this.request<Notification[] | null>('/api/notifications');
+    return result || [];
   }
 
   async getNotification(id: number): Promise<Notification> {
@@ -182,12 +196,14 @@ class ApiClient {
   }
 
   async getNotificationProviders(): Promise<NotificationProvider[]> {
-    return this.request<NotificationProvider[]>('/api/notifications/providers');
+    const result = await this.request<NotificationProvider[] | null>('/api/notifications/providers');
+    return result || [];
   }
 
   // Status Page endpoints
   async getStatusPages(): Promise<StatusPage[]> {
-    return this.request<StatusPage[]>('/api/status-pages');
+    const result = await this.request<StatusPage[] | null>('/api/status-pages');
+    return result || [];
   }
 
   async getStatusPage(id: number): Promise<StatusPageWithMonitors> {
@@ -223,7 +239,8 @@ class ApiClient {
   }
 
   async getIncidents(statusPageId: number): Promise<Incident[]> {
-    return this.request<Incident[]>(`/api/status-pages/${statusPageId}/incidents`);
+    const result = await this.request<Incident[] | null>(`/api/status-pages/${statusPageId}/incidents`);
+    return result || [];
   }
 
   async createIncident(statusPageId: number, data: CreateIncidentRequest): Promise<Incident> {

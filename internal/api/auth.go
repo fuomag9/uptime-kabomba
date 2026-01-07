@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/config"
-	"github.com/fuomag9/uptime-kuma-go/internal/models"
+	"github.com/fuomag9/uptime-kabomba/internal/config"
+	"github.com/fuomag9/uptime-kabomba/internal/models"
 )
 
 type contextKey string
@@ -34,7 +34,7 @@ type LoginResponse struct {
 }
 
 // HandleLogin handles user login
-func HandleLogin(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
+func HandleLogin(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -47,7 +47,7 @@ func HandleLogin(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
 
 		// Find user
 		var user models.User
-		err := db.Get(&user, "SELECT * FROM users WHERE username = ?", req.Username)
+		err := db.Where("username = ?", req.Username).First(&user).Error
 		if err != nil {
 			log.Println("Login: User not found:", req.Username, "Error:", err.Error())
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
@@ -97,7 +97,7 @@ func HandleLogout() http.HandlerFunc {
 }
 
 // HandleSetup handles initial setup
-func HandleSetup(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
+func HandleSetup(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -106,8 +106,8 @@ func HandleSetup(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
 		}
 
 		// Check if setup is already done
-		var count int
-		err := db.Get(&count, "SELECT COUNT(*) FROM users")
+		var count int64
+		err := db.Model(&models.User{}).Count(&count).Error
 		if err != nil {
 			log.Println("Error checking user count:", err.Error())
 			http.Error(w, "Database error", http.StatusInternalServerError)
@@ -127,11 +127,14 @@ func HandleSetup(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
 		}
 
 		// Create user
-		var userID int
-		err = db.QueryRow(
-			"INSERT INTO users (username, password, active, created_at) VALUES (?, ?, ?, ?) RETURNING id",
-			req.Username, string(hashedPassword), true, time.Now(),
-		).Scan(&userID)
+		newUser := models.User{
+			Username:  req.Username,
+			Password:  string(hashedPassword),
+			Active:    true,
+			CreatedAt: time.Now(),
+		}
+
+		err = db.Create(&newUser).Error
 		if err != nil {
 			log.Println("Error creating user:", err.Error())
 			http.Error(w, "Failed to create user", http.StatusInternalServerError)
@@ -139,7 +142,7 @@ func HandleSetup(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
 		}
 
 		// Generate JWT
-		token, err := generateJWT(userID, cfg.JWTSecret)
+		token, err := generateJWT(newUser.ID, cfg.JWTSecret)
 		if err != nil {
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 			return
@@ -149,17 +152,13 @@ func HandleSetup(db *sqlx.DB, cfg *config.Config) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(LoginResponse{
 			Token: token,
-			User: &models.User{
-				ID:       userID,
-				Username: req.Username,
-				Active:   true,
-			},
+			User:  &newUser,
 		})
 	}
 }
 
 // HandleGetCurrentUser returns the current authenticated user
-func HandleGetCurrentUser(db *sqlx.DB) http.HandlerFunc {
+func HandleGetCurrentUser(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		w.Header().Set("Content-Type", "application/json")
@@ -168,7 +167,7 @@ func HandleGetCurrentUser(db *sqlx.DB) http.HandlerFunc {
 }
 
 // AuthMiddleware validates JWT tokens
-func AuthMiddleware(jwtSecret string, db *sqlx.DB) func(http.Handler) http.Handler {
+func AuthMiddleware(jwtSecret string, db *gorm.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -198,7 +197,7 @@ func AuthMiddleware(jwtSecret string, db *sqlx.DB) func(http.Handler) http.Handl
 
 			// Load user from database
 			var user models.User
-			err = db.Get(&user, "SELECT * FROM users WHERE id = ?", userID)
+			err = db.Where("id = ?", userID).First(&user).Error
 			if err != nil {
 				log.Println("AuthMiddleware: Failed to load user:", err.Error())
 				http.Error(w, "Invalid token", http.StatusUnauthorized)

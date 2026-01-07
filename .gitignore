@@ -32,7 +32,7 @@ extra/exe-builder/obj
 *.dylib
 *.test
 *.out
-/uptime-kuma-go
+/uptime-kabomba-server
 /cmd/server/server
 go.sum
 *.db

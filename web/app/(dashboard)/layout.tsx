@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import Link from 'next/link';
 
 export default function DashboardLayout({
@@ -12,6 +13,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { connected } = useWebSocket();
@@ -75,6 +77,7 @@ export default function DashboardLayout({
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <ThemeToggle />
               <span className="text-sm text-gray-700 dark:text-gray-300">
                 {user?.username}
               </span>
@@ -94,32 +97,42 @@ export default function DashboardLayout({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-12 space-x-8">
             <Link
-              href="/dashboard"
-              className="inline-flex items-center border-b-2 border-primary px-1 text-sm font-medium text-gray-900 dark:text-white"
-            >
-              Dashboard
-            </Link>
-            <Link
               href="/monitors"
-              className="inline-flex items-center border-b-2 border-transparent px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              className={`inline-flex items-center border-b-2 px-1 text-sm font-medium ${
+                pathname === '/monitors'
+                  ? 'border-primary text-gray-900 dark:text-white'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
             >
               Monitors
             </Link>
             <Link
-              href="/dashboard/notifications"
-              className="inline-flex items-center border-b-2 border-transparent px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              href="/notifications"
+              className={`inline-flex items-center border-b-2 px-1 text-sm font-medium ${
+                pathname === '/notifications'
+                  ? 'border-primary text-gray-900 dark:text-white'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
             >
               Notifications
             </Link>
             <Link
               href="/status-pages"
-              className="inline-flex items-center border-b-2 border-transparent px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              className={`inline-flex items-center border-b-2 px-1 text-sm font-medium ${
+                pathname === '/status-pages'
+                  ? 'border-primary text-gray-900 dark:text-white'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
             >
               Status Pages
             </Link>
             <Link
               href="/settings"
-              className="inline-flex items-center border-b-2 border-transparent px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              className={`inline-flex items-center border-b-2 px-1 text-sm font-medium ${
+                pathname === '/settings'
+                  ? 'border-primary text-gray-900 dark:text-white'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
             >
               Settings
             </Link>

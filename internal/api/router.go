@@ -6,16 +6,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/config"
-	"github.com/fuomag9/uptime-kuma-go/internal/websocket"
-	"github.com/fuomag9/uptime-kuma-go/internal/monitor"
-	"github.com/fuomag9/uptime-kuma-go/internal/notification"
+	"github.com/fuomag9/uptime-kabomba/internal/config"
+	"github.com/fuomag9/uptime-kabomba/internal/websocket"
+	"github.com/fuomag9/uptime-kabomba/internal/monitor"
+	"github.com/fuomag9/uptime-kabomba/internal/notification"
 )
 
 // NewRouter creates a new HTTP router
-func NewRouter(cfg *config.Config, db *sqlx.DB, hub *websocket.Hub, executor *monitor.Executor, dispatcher *notification.Dispatcher) http.Handler {
+func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *monitor.Executor, dispatcher *notification.Dispatcher) http.Handler {
 	r := chi.NewRouter()
 
 	// Middleware

@@ -1,6 +1,6 @@
-# Uptime Kuma Go - Modern Uptime Monitoring
+# Uptime Kabomba - Modern Uptime Monitoring
 
-A complete rewrite of [Uptime Kuma](https://github.com/louislam/uptime-kuma) in **Go** (backend) and **Next.js 15** (frontend), providing a fast, type-safe, and production-ready uptime monitoring solution.
+A fast, type-safe, and production-ready uptime monitoring solution built with **Go** (backend) and **Next.js 15** (frontend).
 
 ## Features
 
@@ -51,8 +51,8 @@ A complete rewrite of [Uptime Kuma](https://github.com/louislam/uptime-kuma) in 
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/uptime-kuma-go
-cd uptime-kuma-go
+git clone https://github.com/fuomag9/uptime-kabomba
+cd uptime-kabomba
 
 # Start both backend and frontend
 docker-compose up -d
@@ -103,8 +103,8 @@ export DATABASE_DSN=./data/uptime.db
 export JWT_SECRET=your-secret-key
 
 # Build and run
-go build -o bin/uptime-kuma-server ./cmd/server
-./bin/uptime-kuma-server
+go build -o bin/uptime-kabomba-server ./cmd/server
+./bin/uptime-kabomba-server
 ```
 
 **Frontend:**
@@ -349,15 +349,15 @@ The system runs several automated background jobs:
 - **Monitor Capacity**: Tested with 1000+ concurrent monitors
 - **Response Time**: <100ms API response time (p95)
 - **WebSocket Latency**: <50ms message delivery
-- **Memory Footprint**: ~50% smaller than Node.js version
-- **Heartbeat Write**: 10x faster than original Uptime Kuma
+- **Memory Footprint**: Efficient Go runtime (~100MB)
+- **Heartbeat Write**: Optimized for high-throughput writes
 
 ## Development
 
 ### Project Structure
 
 ```
-uptime-kuma-go/
+uptime-kabomba/
 ├── cmd/server/          # Application entry point
 ├── internal/
 │   ├── api/             # HTTP handlers & routes
@@ -394,26 +394,12 @@ npm test
 
 ```bash
 # Backend
-CGO_ENABLED=1 go build -a -installsuffix cgo -o uptime-kuma-server ./cmd/server
+CGO_ENABLED=1 go build -a -installsuffix cgo -o uptime-kabomba-server ./cmd/server
 
 # Frontend
 cd web
 npm run build
 ```
-
-## Comparison with Original
-
-| Feature | Original (Node.js) | This Rewrite (Go) |
-|---------|-------------------|-------------------|
-| Backend Language | Node.js | Go |
-| Frontend Framework | Vue.js 3 | Next.js 15 |
-| Database ORM | RedBean | sqlx (no ORM) |
-| Real-time | Socket.IO | Native WebSocket |
-| Monitor Types | 20+ | 5 (core types) |
-| Notification Providers | 86+ | 9 (Tier 1 & 2) |
-| Memory Usage | ~200MB | ~100MB |
-| Startup Time | ~5s | ~1s |
-| Type Safety | JavaScript | Go + TypeScript |
 
 ## License
 
@@ -425,5 +411,5 @@ Contributions welcome! Please open an issue or PR.
 
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/yourusername/uptime-kuma-go/issues)
-- Discussions: [GitHub Discussions](https://github.com/yourusername/uptime-kuma-go/discussions)
+- Issues: [GitHub Issues](https://github.com/fuomag9/uptime-kabomba/issues)
+- Discussions: [GitHub Discussions](https://github.com/fuomag9/uptime-kabomba/discussions)

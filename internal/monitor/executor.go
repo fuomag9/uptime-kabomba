@@ -2,19 +2,18 @@ package monitor
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"sync"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/fuomag9/uptime-kuma-go/internal/websocket"
-	"github.com/fuomag9/uptime-kuma-go/internal/notification"
+	"gorm.io/gorm"
+	"github.com/fuomag9/uptime-kabomba/internal/websocket"
+	"github.com/fuomag9/uptime-kabomba/internal/notification"
 )
 
 // Executor manages monitor execution
 type Executor struct {
-	db         *sqlx.DB
+	db         *gorm.DB
 	hub        *websocket.Hub
 	dispatcher *notification.Dispatcher
 	monitors   map[int]*monitorJob
@@ -31,7 +30,7 @@ type monitorJob struct {
 }
 
 // NewExecutor creates a new monitor executor
-func NewExecutor(db *sqlx.DB, hub *websocket.Hub, dispatcher *notification.Dispatcher) *Executor {
+func NewExecutor(db *gorm.DB, hub *websocket.Hub, dispatcher *notification.Dispatcher) *Executor {
 	return &Executor{
 		db:         db,
 		hub:        hub,
@@ -44,8 +43,7 @@ func NewExecutor(db *sqlx.DB, hub *websocket.Hub, dispatcher *notification.Dispa
 func (e *Executor) Start() error {
 	// Load all active monitors
 	var monitors []*Monitor
-	query := `SELECT id, user_id, name, type, url, interval, timeout, active, config, created_at, updated_at FROM monitors WHERE active = true`
-	err := e.db.Select(&monitors, query)
+	err := e.db.Where("active = ?", true).Find(&monitors).Error
 	if err != nil {
 		return err
 	}
@@ -53,14 +51,7 @@ func (e *Executor) Start() error {
 	log.Printf("Starting %d active monitors", len(monitors))
 
 	for _, monitor := range monitors {
-		// Parse config JSON
-		if monitor.ConfigJSON != "" {
-			if err := json.Unmarshal([]byte(monitor.ConfigJSON), &monitor.Config); err != nil {
-				log.Printf("Failed to parse config for monitor %d: %v", monitor.ID, err)
-				continue
-			}
-		}
-
+		// Config is already parsed by AfterFind hook
 		e.StartMonitor(monitor)
 	}
 
@@ -81,10 +72,10 @@ func (e *Executor) StartMonitor(monitor *Monitor) {
 	// Get last heartbeat status from database
 	lastStatus := StatusPending
 	var lastHeartbeat struct {
-		Status int `db:"status"`
+		Status int `gorm:"column:status"`
 	}
 	query := `SELECT status FROM heartbeats WHERE monitor_id = ? ORDER BY time DESC LIMIT 1`
-	if err := e.db.Get(&lastHeartbeat, query, monitor.ID); err == nil {
+	if err := e.db.Raw(query, monitor.ID).Scan(&lastHeartbeat).Error; err == nil {
 		lastStatus = lastHeartbeat.Status
 	}
 
@@ -222,14 +213,14 @@ func (job *monitorJob) saveHeartbeat(heartbeat *Heartbeat) error {
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
-	_, err := job.executor.db.Exec(query,
+	err := job.executor.db.Exec(query,
 		heartbeat.MonitorID,
 		heartbeat.Status,
 		heartbeat.Ping,
 		heartbeat.Important,
 		heartbeat.Message,
 		heartbeat.Time,
-	)
+	).Error
 
 	return err
 }

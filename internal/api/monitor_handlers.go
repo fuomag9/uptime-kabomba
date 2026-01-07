@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/models"
-	"github.com/fuomag9/uptime-kuma-go/internal/monitor"
+	"github.com/fuomag9/uptime-kabomba/internal/models"
+	"github.com/fuomag9/uptime-kabomba/internal/monitor"
 )
 
 // MonitorExecutor interface for monitor execution
@@ -19,53 +19,73 @@ type MonitorExecutor interface {
 	StopMonitor(monitorID int)
 }
 
-// HandleGetMonitors returns all monitors for the current user
-func HandleGetMonitors(db *sqlx.DB) http.HandlerFunc {
+// MonitorWithStatus includes monitor data with its last heartbeat
+type MonitorWithStatus struct {
+	models.Monitor
+	LastHeartbeat *models.Heartbeat `json:"last_heartbeat,omitempty"`
+}
+
+// HandleGetMonitors returns all monitors for the current user with their last heartbeat
+func HandleGetMonitors(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 
 		var monitors []models.Monitor
-		query := `SELECT id, user_id, name, type, url, interval, timeout, active, config, created_at, updated_at
-		          FROM monitors WHERE user_id = ? ORDER BY created_at DESC`
+		err := db.Where("user_id = ?", user.ID).
+			Order("created_at DESC").
+			Find(&monitors).Error
 
-		err := db.Select(&monitors, query, user.ID)
 		if err != nil {
 			http.Error(w, "Failed to fetch monitors", http.StatusInternalServerError)
 			return
 		}
 
-		// Parse config JSON for each monitor
-		for i := range monitors {
-			if monitors[i].ConfigRaw != "" {
-				json.Unmarshal([]byte(monitors[i].ConfigRaw), &monitors[i].Config)
+		// AfterFind hook automatically unmarshals Config JSON
+
+		// Fetch last heartbeat for each monitor
+		monitorsWithStatus := make([]MonitorWithStatus, len(monitors))
+		for i, mon := range monitors {
+			monitorsWithStatus[i] = MonitorWithStatus{
+				Monitor: mon,
 			}
+
+			var lastHeartbeat models.Heartbeat
+			err := db.Where("monitor_id = ?", mon.ID).
+				Order("time DESC").
+				Limit(1).
+				First(&lastHeartbeat).Error
+
+			if err == nil {
+				monitorsWithStatus[i].LastHeartbeat = &lastHeartbeat
+			}
+			// Ignore error if no heartbeat exists yet
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(monitors)
+		json.NewEncoder(w).Encode(monitorsWithStatus)
 	}
 }
 
 // HandleGetMonitor returns a single monitor by ID
-func HandleGetMonitor(db *sqlx.DB) http.HandlerFunc {
+func HandleGetMonitor(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		monitorID := chi.URLParam(r, "id")
 
 		var mon models.Monitor
-		query := `SELECT id, user_id, name, type, url, interval, timeout, active, config, created_at, updated_at
-		          FROM monitors WHERE id = ? AND user_id = ?`
+		err := db.Where("id = ? AND user_id = ?", monitorID, user.ID).
+			First(&mon).Error
 
-		err := db.Get(&mon, query, monitorID, user.ID)
 		if err != nil {
-			http.Error(w, "Monitor not found", http.StatusNotFound)
+			if err == gorm.ErrRecordNotFound {
+				http.Error(w, "Monitor not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "Failed to fetch monitor", http.StatusInternalServerError)
+			}
 			return
 		}
 
-		// Parse config JSON
-		if mon.ConfigRaw != "" {
-			json.Unmarshal([]byte(mon.ConfigRaw), &mon.Config)
-		}
+		// AfterFind hook automatically unmarshals Config JSON
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(mon)
@@ -73,7 +93,7 @@ func HandleGetMonitor(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleCreateMonitor creates a new monitor
-func HandleCreateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc {
+func HandleCreateMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 
@@ -120,26 +140,10 @@ func HandleCreateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 			return
 		}
 
-		// Marshal config to JSON
-		configJSON, err := json.Marshal(mon.Config)
-		if err != nil {
-			http.Error(w, "Failed to marshal config", http.StatusInternalServerError)
-			return
-		}
-		mon.ConfigRaw = string(configJSON)
+		// BeforeSave hook will automatically marshal Config to ConfigRaw
 
 		// Insert into database
-		query := `
-			INSERT INTO monitors (user_id, name, type, url, interval, timeout, active, config, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			RETURNING id
-		`
-
-		err = db.QueryRow(query,
-			mon.UserID, mon.Name, mon.Type, mon.URL, mon.Interval, mon.Timeout,
-			mon.Active, mon.ConfigRaw, mon.CreatedAt, mon.UpdatedAt,
-		).Scan(&mon.ID)
-
+		err := db.Create(&mon).Error
 		if err != nil {
 			http.Error(w, "Failed to create monitor", http.StatusInternalServerError)
 			return
@@ -162,7 +166,7 @@ func HandleCreateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 }
 
 // HandleUpdateMonitor updates an existing monitor
-func HandleUpdateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc {
+func HandleUpdateMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		monitorID := chi.URLParam(r, "id")
@@ -182,8 +186,10 @@ func HandleUpdateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 		mon.ID = id
 
 		// Verify ownership
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ? AND user_id = ?", mon.ID, user.ID)
+		var count int64
+		db.Model(&models.Monitor{}).
+			Where("id = ? AND user_id = ?", mon.ID, user.ID).
+			Count(&count)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -215,27 +221,22 @@ func HandleUpdateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 			return
 		}
 
-		// Marshal config to JSON
-		configJSON, err := json.Marshal(mon.Config)
-		if err != nil {
-			http.Error(w, "Failed to marshal config", http.StatusInternalServerError)
-			return
-		}
-		mon.ConfigRaw = string(configJSON)
+		// BeforeSave hook will automatically marshal Config to ConfigRaw
 		mon.UpdatedAt = time.Now()
 
 		// Update database
-		query := `
-			UPDATE monitors
-			SET name = ?, type = ?, url = ?, interval = ?, timeout = ?,
-			    active = ?, config = ?, updated_at = ?
-			WHERE id = ? AND user_id = ?
-		`
-
-		_, err = db.Exec(query,
-			mon.Name, mon.Type, mon.URL, mon.Interval, mon.Timeout,
-			mon.Active, mon.ConfigRaw, mon.UpdatedAt, mon.ID, user.ID,
-		)
+		err = db.Model(&models.Monitor{}).
+			Where("id = ? AND user_id = ?", mon.ID, user.ID).
+			Updates(map[string]interface{}{
+				"name":       mon.Name,
+				"type":       mon.Type,
+				"url":        mon.URL,
+				"interval":   mon.Interval,
+				"timeout":    mon.Timeout,
+				"active":     mon.Active,
+				"config":     mon.ConfigRaw,
+				"updated_at": mon.UpdatedAt,
+			}).Error
 
 		if err != nil {
 			http.Error(w, "Failed to update monitor", http.StatusInternalServerError)
@@ -256,7 +257,7 @@ func HandleUpdateMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 }
 
 // HandleDeleteMonitor deletes a monitor
-func HandleDeleteMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc {
+func HandleDeleteMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(userContextKey).(*models.User)
 		monitorID := chi.URLParam(r, "id")
@@ -274,15 +275,15 @@ func HandleDeleteMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 		}
 
 		// Delete from database
-		query := `DELETE FROM monitors WHERE id = ? AND user_id = ?`
-		result, err := db.Exec(query, id, user.ID)
-		if err != nil {
+		result := db.Where("id = ? AND user_id = ?", id, user.ID).
+			Delete(&models.Monitor{})
+
+		if result.Error != nil {
 			http.Error(w, "Failed to delete monitor", http.StatusInternalServerError)
 			return
 		}
 
-		rows, _ := result.RowsAffected()
-		if rows == 0 {
+		if result.RowsAffected == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
 		}
@@ -292,7 +293,7 @@ func HandleDeleteMonitor(db *sqlx.DB, executor MonitorExecutor) http.HandlerFunc
 }
 
 // HandleGetHeartbeats returns heartbeats for a monitor
-func HandleGetHeartbeats(db *sqlx.DB) http.HandlerFunc {
+func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		monitorID := chi.URLParam(r, "id")
 
@@ -306,15 +307,11 @@ func HandleGetHeartbeats(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		var heartbeats []monitor.Heartbeat
-		query := `
-			SELECT id, monitor_id, status, ping, important, message, time
-			FROM heartbeats
-			WHERE monitor_id = ?
-			ORDER BY time DESC
-			LIMIT ?
-		`
+		err := db.Where("monitor_id = ?", monitorID).
+			Order("time DESC").
+			Limit(limit).
+			Find(&heartbeats).Error
 
-		err := db.Select(&heartbeats, query, monitorID, limit)
 		if err != nil {
 			http.Error(w, "Failed to fetch heartbeats", http.StatusInternalServerError)
 			return

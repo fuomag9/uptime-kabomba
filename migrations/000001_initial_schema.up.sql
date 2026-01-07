@@ -100,7 +100,9 @@ CREATE TABLE IF NOT EXISTS notifications (
     type TEXT NOT NULL,
     config TEXT NOT NULL, -- JSON blob
     is_default BOOLEAN DEFAULT 0,
+    active BOOLEAN DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -118,14 +120,45 @@ CREATE TABLE IF NOT EXISTS monitor_notifications (
 -- Status pages table
 CREATE TABLE IF NOT EXISTS status_pages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
     slug TEXT NOT NULL UNIQUE,
     title TEXT NOT NULL,
     description TEXT,
     published BOOLEAN DEFAULT 0,
+    show_powered_by BOOLEAN DEFAULT 1,
     theme TEXT DEFAULT 'light',
     custom_css TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_status_pages_user_id ON status_pages(user_id);
+CREATE INDEX IF NOT EXISTS idx_status_pages_slug ON status_pages(slug);
+
+-- Status Page-Monitor mapping
+CREATE TABLE IF NOT EXISTS status_page_monitors (
+    status_page_id INTEGER NOT NULL,
+    monitor_id INTEGER NOT NULL,
+    PRIMARY KEY (status_page_id, monitor_id),
+    FOREIGN KEY (status_page_id) REFERENCES status_pages(id) ON DELETE CASCADE,
+    FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
+);
+
+-- Incidents table
+CREATE TABLE IF NOT EXISTS incidents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    status_page_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    style TEXT DEFAULT 'info',
+    pin BOOLEAN DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (status_page_id) REFERENCES status_pages(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_incidents_status_page ON incidents(status_page_id);
 
 -- API keys table
 CREATE TABLE IF NOT EXISTS api_keys (

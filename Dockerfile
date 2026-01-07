@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o uptime-kuma-server ./cmd/server
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o uptime-kabomba-server ./cmd/server
 
 # Runtime stage
 FROM alpine:latest
@@ -25,7 +25,7 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=backend-builder /app/uptime-kuma-server .
+COPY --from=backend-builder /app/uptime-kabomba-server .
 
 # Copy migrations
 COPY migrations ./migrations
@@ -52,4 +52,4 @@ ENV DATABASE_TYPE=sqlite \
     PORT=8080
 
 # Run the application
-CMD ["./uptime-kuma-server"]
+CMD ["./uptime-kabomba-server"]

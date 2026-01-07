@@ -1,6 +1,6 @@
-# Uptime Kuma (Go + Next.js) - Setup Guide
+# Uptime Kabomba (Go + Next.js) - Setup Guide
 
-Complete setup guide for the Go + Next.js rewrite of Uptime Kuma.
+Complete setup guide for the Go + Next.js rewrite of Uptime Kabomba.
 
 ## Prerequisites
 
@@ -293,8 +293,8 @@ npm run test:e2e
 
 ### Backend
 ```bash
-go build -o uptime-kuma-go cmd/server/main.go
-./uptime-kuma-go
+go build -o uptime-kabomba-go cmd/server/main.go
+./uptime-kabomba-go
 ```
 
 ### Frontend
@@ -306,8 +306,8 @@ npm start
 
 ### Docker Production Build
 ```bash
-docker build -t uptime-kuma-go:latest .
-docker run -p 8080:8080 -v $(pwd)/data:/app/data uptime-kuma-go:latest
+docker build -t uptime-kabomba-go:latest .
+docker run -p 8080:8080 -v $(pwd)/data:/app/data uptime-kabomba-go:latest
 ```
 
 ## Troubleshooting
@@ -373,15 +373,15 @@ npm install
 
 ## Contributing
 
-This is a complete rewrite of the original Uptime Kuma. See the main plan at:
+This is a complete rewrite of the original Uptime Kabomba. See the main plan at:
 `/Users/fuomag9/.claude/plans/recursive-wobbling-flame.md`
 
 ## License
 
-MIT (same as original Uptime Kuma)
+MIT (same as original Uptime Kabomba)
 
 ## Credits
 
-Original Uptime Kuma by Louis Lam: https://github.com/louislam/uptime-kuma
+Original Uptime Kabomba by Louis Lam: https://github.com/louislam/uptime-kabomba
 
 This rewrite uses Go and Next.js for improved performance and modern development experience.

@@ -6,13 +6,14 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 
-	"github.com/fuomag9/uptime-kuma-go/internal/uptime"
+	"github.com/fuomag9/uptime-kabomba/internal/models"
+	"github.com/fuomag9/uptime-kabomba/internal/uptime"
 )
 
 // HandleStatusBadge generates a status badge SVG
-func HandleStatusBadge(db *sqlx.DB) http.HandlerFunc {
+func HandleStatusBadge(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		monitorID := chi.URLParam(r, "id")
 		id, err := strconv.Atoi(monitorID)
@@ -22,17 +23,19 @@ func HandleStatusBadge(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		// Check if monitor exists
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ?", id)
+		var count int64
+		db.Model(&models.Monitor{}).Where("id = ?", id).Count(&count)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
 		}
 
 		// Get latest heartbeat
-		var status int
-		query := `SELECT status FROM heartbeats WHERE monitor_id = ? ORDER BY time DESC LIMIT 1`
-		err = db.Get(&status, query, id)
+		var heartbeat models.Heartbeat
+		err = db.Where("monitor_id = ?", id).
+			Order("time DESC").
+			Limit(1).
+			First(&heartbeat).Error
 
 		var statusText, color string
 		if err != nil {
@@ -40,7 +43,7 @@ func HandleStatusBadge(db *sqlx.DB) http.HandlerFunc {
 			statusText = "unknown"
 			color = "gray"
 		} else {
-			switch status {
+			switch heartbeat.Status {
 			case 1:
 				statusText = "up"
 				color = "brightgreen"
@@ -65,7 +68,7 @@ func HandleStatusBadge(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandleUptimeBadge generates an uptime percentage badge
-func HandleUptimeBadge(db *sqlx.DB) http.HandlerFunc {
+func HandleUptimeBadge(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		monitorID := chi.URLParam(r, "id")
 		id, err := strconv.Atoi(monitorID)
@@ -75,8 +78,8 @@ func HandleUptimeBadge(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		// Check if monitor exists
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ?", id)
+		var count int64
+		db.Model(&models.Monitor{}).Where("id = ?", id).Count(&count)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
@@ -134,7 +137,7 @@ func HandleUptimeBadge(db *sqlx.DB) http.HandlerFunc {
 }
 
 // HandlePingBadge generates a ping time badge
-func HandlePingBadge(db *sqlx.DB) http.HandlerFunc {
+func HandlePingBadge(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		monitorID := chi.URLParam(r, "id")
 		id, err := strconv.Atoi(monitorID)
@@ -144,17 +147,20 @@ func HandlePingBadge(db *sqlx.DB) http.HandlerFunc {
 		}
 
 		// Check if monitor exists
-		var count int
-		db.Get(&count, "SELECT COUNT(*) FROM monitors WHERE id = ?", id)
+		var count int64
+		db.Model(&models.Monitor{}).Where("id = ?", id).Count(&count)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)
 			return
 		}
 
 		// Get average ping from last 10 heartbeats
-		var avgPing float64
-		query := `SELECT AVG(ping) FROM (SELECT ping FROM heartbeats WHERE monitor_id = ? AND status = 1 ORDER BY time DESC LIMIT 10)`
-		err = db.Get(&avgPing, query, id)
+		var result struct {
+			AvgPing float64 `gorm:"column:avg_ping"`
+		}
+		err = db.Raw(`SELECT AVG(ping) as avg_ping FROM (SELECT ping FROM heartbeats WHERE monitor_id = ? AND status = 1 ORDER BY time DESC LIMIT 10)`, id).
+			Scan(&result).Error
+		avgPing := result.AvgPing
 
 		var pingText, color string
 		if err != nil || avgPing == 0 {
