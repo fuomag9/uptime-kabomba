@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { MonitorSidebar } from '@/components/MonitorSidebar';
 import Link from 'next/link';
 
 export default function DashboardLayout({
@@ -60,10 +61,10 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <header className="bg-white dark:bg-gray-800 shadow z-10 flex-shrink-0">
+        <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between items-center">
             <div className="flex items-center">
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -77,6 +78,36 @@ export default function DashboardLayout({
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <Link
+                href="/notifications"
+                className={`text-sm font-medium ${
+                  pathname === '/notifications'
+                    ? 'text-primary'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Notifications
+              </Link>
+              <Link
+                href="/status-pages"
+                className={`text-sm font-medium ${
+                  pathname === '/status-pages' || pathname.startsWith('/status-pages/')
+                    ? 'text-primary'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Status Pages
+              </Link>
+              <Link
+                href="/settings"
+                className={`text-sm font-medium ${
+                  pathname === '/settings'
+                    ? 'text-primary'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Settings
+              </Link>
               <ThemeToggle />
               <span className="text-sm text-gray-700 dark:text-gray-300">
                 {user?.username}
@@ -92,58 +123,18 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      {/* Navigation */}
-      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-12 space-x-8">
-            <Link
-              href="/monitors"
-              className={`inline-flex items-center border-b-2 px-1 text-sm font-medium ${
-                pathname === '/monitors'
-                  ? 'border-primary text-gray-900 dark:text-white'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-            >
-              Monitors
-            </Link>
-            <Link
-              href="/notifications"
-              className={`inline-flex items-center border-b-2 px-1 text-sm font-medium ${
-                pathname === '/notifications'
-                  ? 'border-primary text-gray-900 dark:text-white'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-            >
-              Notifications
-            </Link>
-            <Link
-              href="/status-pages"
-              className={`inline-flex items-center border-b-2 px-1 text-sm font-medium ${
-                pathname === '/status-pages'
-                  ? 'border-primary text-gray-900 dark:text-white'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-            >
-              Status Pages
-            </Link>
-            <Link
-              href="/settings"
-              className={`inline-flex items-center border-b-2 px-1 text-sm font-medium ${
-                pathname === '/settings'
-                  ? 'border-primary text-gray-900 dark:text-white'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-            >
-              Settings
-            </Link>
-          </div>
-        </div>
-      </nav>
+      {/* Main Layout with Sidebar */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <MonitorSidebar />
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="px-4 sm:px-6 lg:px-8 py-8">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
