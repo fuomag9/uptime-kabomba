@@ -27,8 +27,8 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=backend-builder /app/uptime-kabomba-server .
 
-# Copy migrations
-COPY migrations ./migrations
+# Copy migrations from builder
+COPY --from=backend-builder /app/migrations ./migrations
 
 # Create data directory for SQLite
 RUN mkdir -p /data
