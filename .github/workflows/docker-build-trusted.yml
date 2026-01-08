@@ -24,15 +24,17 @@ jobs:
       matrix:
         include:
           - service: backend
-            dockerfile: Dockerfile
+            dockerfile: ./Dockerfile
             context: .
           - service: frontend
-            dockerfile: Dockerfile
+            dockerfile: ./web/Dockerfile
             context: web
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

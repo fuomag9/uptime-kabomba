@@ -21,10 +21,10 @@ jobs:
       matrix:
         include:
           - service: backend
-            dockerfile: Dockerfile
+            dockerfile: ./Dockerfile
             context: .
           - service: frontend
-            dockerfile: Dockerfile
+            dockerfile: ./web/Dockerfile
             context: web
 
     steps:
