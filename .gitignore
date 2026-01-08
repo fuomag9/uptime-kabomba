@@ -34,7 +34,6 @@ extra/exe-builder/obj
 *.out
 /uptime-kabomba-server
 /cmd/server/server
-go.sum
 *.db
 *.db-shm
 *.db-wal
