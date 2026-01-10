@@ -1,11 +1,5 @@
--- Add missing columns to notifications table
-ALTER TABLE notifications ADD COLUMN active BOOLEAN DEFAULT 1;
-ALTER TABLE notifications ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-
--- Add missing columns to status_pages table
-ALTER TABLE status_pages ADD COLUMN user_id INTEGER;
-ALTER TABLE status_pages ADD COLUMN show_powered_by BOOLEAN DEFAULT 1;
-ALTER TABLE status_pages ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+-- Note: All columns already exist in initial schema (000001_initial_schema.up.sql)
+-- This migration only creates the mapping tables and additional indexes
 
 -- Create status_page_monitors mapping table
 CREATE TABLE IF NOT EXISTS status_page_monitors (
@@ -29,6 +23,5 @@ CREATE TABLE IF NOT EXISTS incidents (
     FOREIGN KEY (status_page_id) REFERENCES status_pages(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_status_pages_user_id ON status_pages(user_id);
-CREATE INDEX IF NOT EXISTS idx_status_pages_slug ON status_pages(slug);
+-- Add additional indexes (idx_status_pages_user_id and idx_status_pages_slug already exist in 000001)
 CREATE INDEX IF NOT EXISTS idx_incidents_status_page ON incidents(status_page_id);

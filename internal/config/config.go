@@ -16,6 +16,7 @@ type Config struct {
 	JWTSecret    string
 	Environment  string
 	CORSOrigins  []string
+	OAuth        *OAuthConfig
 }
 
 // DatabaseConfig holds database configuration
@@ -26,10 +27,21 @@ type DatabaseConfig struct {
 	MaxIdleConns int
 }
 
+// OAuthConfig holds OAuth2/OIDC configuration
+type OAuthConfig struct {
+	Enabled      bool
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	Scopes       []string
+}
+
 // Load loads configuration from environment variables
 func Load() *Config {
 	env := getEnv("ENVIRONMENT", "production")
 	jwtSecret := loadJWTSecret(env)
+	oauthConfig := loadOAuthConfig()
 
 	cfg := &Config{
 		Port: getEnvInt("PORT", 8080),
@@ -42,6 +54,7 @@ func Load() *Config {
 		JWTSecret:   jwtSecret,
 		Environment: env,
 		CORSOrigins: loadCORSOrigins(env),
+		OAuth:       oauthConfig,
 	}
 
 	// Validate configuration
@@ -76,6 +89,17 @@ func (c *Config) Validate() error {
 
 	if len(c.CORSOrigins) == 0 {
 		return fmt.Errorf("at least one CORS origin must be configured")
+	}
+
+	// Validate OAuth config if enabled
+	if c.OAuth != nil && c.OAuth.Enabled {
+		if c.OAuth.Issuer == "" {
+			return fmt.Errorf("OAUTH_ISSUER is required when OAuth is enabled")
+		}
+		if c.OAuth.ClientID == "" || c.OAuth.ClientSecret == "" {
+			return fmt.Errorf("OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required when OAuth is enabled")
+		}
+		// OAUTH_REDIRECT_URL is optional - will be constructed from request if not provided
 	}
 
 	return nil
@@ -175,4 +199,35 @@ func generateRandomSecret() string {
 		log.Fatal("Failed to generate random secret:", err)
 	}
 	return base64.URLEncoding.EncodeToString(bytes)
+}
+
+func loadOAuthConfig() *OAuthConfig {
+	issuer := os.Getenv("OAUTH_ISSUER")
+	if issuer == "" {
+		return &OAuthConfig{Enabled: false}
+	}
+
+	clientID := os.Getenv("OAUTH_CLIENT_ID")
+	clientSecret := os.Getenv("OAUTH_CLIENT_SECRET")
+	redirectURL := os.Getenv("OAUTH_REDIRECT_URL")
+
+	if clientID == "" || clientSecret == "" {
+		log.Println("WARNING: OAUTH_ISSUER is set but OAUTH_CLIENT_ID or OAUTH_CLIENT_SECRET is missing. OAuth will be disabled.")
+		return &OAuthConfig{Enabled: false}
+	}
+
+	// Default scopes
+	scopes := []string{"openid", "profile", "email"}
+	if scopesEnv := os.Getenv("OAUTH_SCOPES"); scopesEnv != "" {
+		scopes = splitAndTrim(scopesEnv, ",")
+	}
+
+	return &OAuthConfig{
+		Enabled:      true,
+		Issuer:       issuer,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  redirectURL,
+		Scopes:       scopes,
+	}
 }

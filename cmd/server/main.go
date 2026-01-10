@@ -16,6 +16,7 @@ import (
 	"github.com/fuomag9/uptime-kabomba/internal/jobs"
 	"github.com/fuomag9/uptime-kabomba/internal/monitor"
 	"github.com/fuomag9/uptime-kabomba/internal/notification"
+	"github.com/fuomag9/uptime-kabomba/internal/oauth"
 	"github.com/fuomag9/uptime-kabomba/internal/websocket"
 )
 
@@ -58,6 +59,11 @@ func main() {
 	// Initialize job scheduler
 	scheduler := jobs.NewScheduler(db)
 	scheduler.Start()
+
+	// Start OAuth cleanup job if OAuth is enabled
+	if cfg.OAuth != nil && cfg.OAuth.Enabled {
+		oauth.StartCleanupJob(db)
+	}
 	defer scheduler.Stop()
 
 	// Setup API router

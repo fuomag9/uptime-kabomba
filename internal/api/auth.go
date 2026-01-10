@@ -47,18 +47,24 @@ func HandleLogin(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 
 		// Find user
 		var user models.User
-		err := db.Where("username = ?", req.Username).First(&user).Error
+		// Find user by username or email
+		err := db.Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error
 		if err != nil {
-			log.Println("Login: Authentication failed")
+			log.Println("Login: Authentication failed - user not found")
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
 
-		// Password verification
+		// Check if user has a password (OAuth-only users don't)
+		if !user.HasPassword() {
+			log.Println("Login: User has no password (OAuth-only account)")
+			http.Error(w, "This account uses OAuth authentication. Please sign in with OAuth.", http.StatusUnauthorized)
+			return
+		}
 
 		// Verify password
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-			log.Println("Login: Authentication failed")
+			log.Println("Login: Authentication failed - invalid password")
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
@@ -105,19 +111,6 @@ func HandleSetup(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// Check if setup is already done
-		var count int64
-		err := db.Model(&models.User{}).Count(&count).Error
-		if err != nil {
-			log.Println("Error checking user count:", err.Error())
-			http.Error(w, "Database error", http.StatusInternalServerError)
-			return
-		}
-		if count > 0 {
-			http.Error(w, "Setup already completed", http.StatusBadRequest)
-			return
-		}
-
 		// Hash password
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
@@ -126,10 +119,12 @@ func HandleSetup(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		// Create user
+		// Create user with local provider
+		provider := "local"
 		newUser := models.User{
 			Username:  req.Username,
 			Password:  string(hashedPassword),
+			Provider:  &provider,
 			Active:    true,
 			CreatedAt: time.Now(),
 		}

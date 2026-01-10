@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -9,9 +10,10 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/fuomag9/uptime-kabomba/internal/config"
-	"github.com/fuomag9/uptime-kabomba/internal/websocket"
 	"github.com/fuomag9/uptime-kabomba/internal/monitor"
 	"github.com/fuomag9/uptime-kabomba/internal/notification"
+	"github.com/fuomag9/uptime-kabomba/internal/oauth"
+	"github.com/fuomag9/uptime-kabomba/internal/websocket"
 )
 
 // NewRouter creates a new HTTP router
@@ -47,6 +49,19 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 	authLimiter := NewRateLimiter(5.0/900.0, 5)
 	authLimiter.CleanupOldLimiters()
 
+	// Initialize OAuth client if enabled
+	var oauthClient *oauth.Client
+	var err error
+	if cfg.OAuth != nil && cfg.OAuth.Enabled {
+		oauthClient, err = oauth.NewClient(cfg.OAuth)
+		if err != nil {
+			log.Printf("WARNING: Failed to initialize OAuth client: %v", err)
+			log.Println("OAuth authentication will be disabled")
+		} else {
+			log.Println("OAuth client initialized successfully")
+		}
+	}
+
 	// API routes
 	r.Route("/api", func(r chi.Router) {
 		// Auth routes with strict rate limiting
@@ -54,6 +69,14 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 		r.Post("/auth/logout", HandleLogout())
 		r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/setup", HandleSetup(db, cfg))
 		r.Get("/auth/status", HandleGetSetupStatus(db))
+
+		// OAuth routes (if enabled)
+		if oauthClient != nil {
+			r.Get("/auth/oauth/config", HandleGetOAuthConfig(cfg))
+			r.With(StrictRateLimitMiddleware(authLimiter)).Get("/auth/oauth/authorize", HandleOAuthAuthorize(db, cfg, oauthClient))
+			r.With(StrictRateLimitMiddleware(authLimiter)).Get("/auth/oauth/callback", HandleOAuthCallback(db, cfg, oauthClient))
+			r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/oauth/link", HandleOAuthLinkAccount(db, cfg))
+		}
 
 		// Protected routes
 		r.Group(func(r chi.Router) {

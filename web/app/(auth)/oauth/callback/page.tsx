@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense } from 'react';
-import LoginContent from './LoginContent';
+import OAuthCallbackContent from './OAuthCallbackContent';
 
-export default function LoginPage() {
+export default function OAuthCallbackPage() {
   return (
     <Suspense fallback={
       <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -15,7 +15,7 @@ export default function LoginPage() {
         </div>
       </div>
     }>
-      <LoginContent />
+      <OAuthCallbackContent />
     </Suspense>
   );
 }

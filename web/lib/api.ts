@@ -16,8 +16,29 @@ export interface LoginResponse {
 export interface User {
   id: number;
   username: string;
+  email?: string;
+  provider?: string;
   active: boolean;
   created_at: string;
+}
+
+export interface OAuthConfig {
+  enabled: boolean;
+  issuer?: string;
+}
+
+export interface OAuthCallbackResponse {
+  action: 'login' | 'link_required' | 'register' | 'error';
+  token?: string;
+  user?: User;
+  linking_token?: string;
+  email?: string;
+  message?: string;
+}
+
+export interface LinkAccountRequest {
+  linking_token: string;
+  password: string;
 }
 
 export interface ApiError {
@@ -121,6 +142,20 @@ class ApiClient {
 
   async getCurrentUser(): Promise<User> {
     return this.request<User>('/api/user/me');
+  }
+
+  // OAuth endpoints
+  async getOAuthConfig(): Promise<OAuthConfig> {
+    return this.request<OAuthConfig>('/api/auth/oauth/config');
+  }
+
+  async linkOAuthAccount(data: LinkAccountRequest): Promise<LoginResponse> {
+    const response = await this.request<LoginResponse>('/api/auth/oauth/link', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    this.setToken(response.token);
+    return response;
   }
 
   async getSetupStatus(): Promise<{ setupComplete: boolean }> {
