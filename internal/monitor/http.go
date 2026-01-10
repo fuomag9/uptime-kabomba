@@ -32,6 +32,12 @@ func (h *HTTPMonitor) Validate(monitor *Monitor) error {
 		return fmt.Errorf("URL must start with http:// or https://")
 	}
 
+	// SSRF Protection - validate URL to prevent access to private IPs and metadata endpoints
+	ssrfProtection := NewSSRFProtection(false) // Don't allow private IPs by default
+	if err := ssrfProtection.ValidateURL(monitor.URL); err != nil {
+		return fmt.Errorf("URL validation failed: %w", err)
+	}
+
 	if monitor.Timeout <= 0 {
 		monitor.Timeout = 30
 	}

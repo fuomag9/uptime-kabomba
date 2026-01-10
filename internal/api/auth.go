@@ -38,37 +38,37 @@ func HandleLogin(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			log.Println("Login: Failed to decode request:", err.Error())
+			log.Println("Login: Failed to decode request")
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
 
-		log.Println("Login attempt for username:", req.Username)
+		log.Println("Login: Authentication attempt")
 
 		// Find user
 		var user models.User
 		err := db.Where("username = ?", req.Username).First(&user).Error
 		if err != nil {
-			log.Println("Login: User not found:", req.Username, "Error:", err.Error())
+			log.Println("Login: Authentication failed")
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
 
-		log.Println("Login: User found, checking password. Hash:", user.Password[:20]+"...")
+		// Password verification
 
 		// Verify password
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-			log.Println("Login: Password check failed:", err.Error())
+			log.Println("Login: Authentication failed")
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
 
-		log.Println("Login: Success for user:", req.Username)
+		log.Println("Login: Successful authentication")
 
 		// Check 2FA if enabled
 		if user.TotpSecret != nil && *user.TotpSecret != "" {
-			// TODO: Implement 2FA verification
-			// For now, skip 2FA check
+		// WARNING: 2FA is not properly implemented - this is bypassed
+		log.Println("WARNING: User has 2FA configured but it is not enforced")
 		}
 
 		// Generate JWT
@@ -214,7 +214,7 @@ func AuthMiddleware(jwtSecret string, db *gorm.DB) func(http.Handler) http.Handl
 func generateJWT(userID int, secret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID,
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
+		"exp":     time.Now().Add(2 * time.Hour).Unix(), // Reduced from 24h to 2h for security
 	})
 
 	return token.SignedString([]byte(secret))

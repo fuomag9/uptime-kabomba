@@ -42,7 +42,7 @@ func main() {
 	}
 
 	// Initialize WebSocket hub
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(cfg.JWTSecret)
 	go hub.Run()
 
 	// Initialize notification dispatcher

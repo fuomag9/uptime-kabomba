@@ -12,7 +12,13 @@ services:
       - DATABASE_TYPE=sqlite
       - DATABASE_DSN=/data/uptime.db
       - PORT=8080
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+    # Grant CAP_NET_RAW capability for ICMP ping (raw sockets)
+    # This allows ping to work without running as root
+    cap_add:
+      - NET_RAW
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]

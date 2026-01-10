@@ -25,9 +25,9 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 
-	// CORS
+	// CORS - use configured origins
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:8080"},
+		AllowedOrigins:   cfg.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -35,12 +35,24 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 		MaxAge:           300,
 	}))
 
+	// Security headers
+	r.Use(SecurityHeadersMiddleware)
+
+	// Global rate limiter - 100 requests per minute per IP
+	globalLimiter := NewRateLimiter(100.0/60.0, 20)
+	globalLimiter.CleanupOldLimiters()
+	r.Use(RateLimitMiddleware(globalLimiter))
+
+	// Strict rate limiter for auth endpoints - 5 requests per 15 minutes
+	authLimiter := NewRateLimiter(5.0/900.0, 5)
+	authLimiter.CleanupOldLimiters()
+
 	// API routes
 	r.Route("/api", func(r chi.Router) {
-		// Auth routes
-		r.Post("/auth/login", HandleLogin(db, cfg))
+		// Auth routes with strict rate limiting
+		r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/login", HandleLogin(db, cfg))
 		r.Post("/auth/logout", HandleLogout())
-		r.Post("/auth/setup", HandleSetup(db, cfg))
+		r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/setup", HandleSetup(db, cfg))
 
 		// Protected routes
 		r.Group(func(r chi.Router) {

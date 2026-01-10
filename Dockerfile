@@ -40,12 +40,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
-# Run as non-root user (disabled for now to avoid permissions issues)
-# RUN addgroup -g 1000 uptime && \
-#     adduser -D -u 1000 -G uptime uptime && \
-#     chown -R uptime:uptime /app /data
-# USER uptime
-
 # Set environment variables
 ENV DATABASE_TYPE=sqlite \
     DATABASE_DSN=/data/uptime.db \

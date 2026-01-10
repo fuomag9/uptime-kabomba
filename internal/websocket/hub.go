@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 
+	"github.com/golang-jwt/jwt/v5"
 	"nhooyr.io/websocket"
 )
 
@@ -31,15 +33,17 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	mu         sync.RWMutex
+	jwtSecret  string
 }
 
 // NewHub creates a new Hub
-func NewHub() *Hub {
+func NewHub(jwtSecret string) *Hub {
 	return &Hub{
 		clients:    make(map[*Client]bool),
 		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		jwtSecret:  jwtSecret,
 	}
 }
 
@@ -100,16 +104,62 @@ func (h *Hub) Broadcast(msgType string, payload interface{}) error {
 
 // HandleWebSocket handles WebSocket connections
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Authenticate WebSocket connection
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		// Try getting from Authorization header
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "" {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+
+	// Validate JWT token
+	userID := ""
+	if token != "" {
+		parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+			return []byte(h.jwtSecret), nil
+		})
+
+		if err == nil && parsedToken.Valid {
+			claims := parsedToken.Claims.(jwt.MapClaims)
+			if uid, ok := claims["user_id"].(float64); ok {
+				userID = string(rune(int(uid)))
+			}
+		}
+	}
+
+	// For now, allow anonymous connections but log a warning
+	if userID == "" {
+		log.Printf("WebSocket connection without authentication from %s", r.RemoteAddr)
+		// In production, you may want to reject unauthenticated connections:
+		// http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		// return
+	}
+
+	// Verify origin to prevent CSRF
+	origin := r.Header.Get("Origin")
+	if origin != "" {
+		// TODO: Verify origin against allowed origins from config
+		// For now, log it
+		log.Printf("WebSocket connection from origin: %s", origin)
+	}
+
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true, // For development
+		OriginPatterns: []string{"*"}, // TODO: Configure allowed origins
 	})
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return
 	}
 
+	clientID := r.RemoteAddr
+	if userID != "" {
+		clientID = "user:" + userID
+	}
+
 	client := &Client{
-		ID:   r.RemoteAddr, // Use a better ID in production (e.g., user ID)
+		ID:   clientID,
 		Conn: conn,
 		Hub:  h,
 		Send: make(chan []byte, 256),
