@@ -18,6 +18,15 @@ func (s *SMTPProvider) Name() string {
 	return "smtp"
 }
 
+// sanitizeEmailContent removes characters that could be used for header injection
+// or otherwise interfere with the structure of the email.
+func sanitizeEmailContent(s string) string {
+	// Remove CR and LF to prevent header injection and normalize content
+	s = strings.ReplaceAll(s, "\r", "")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return strings.TrimSpace(s)
+}
+
 func (s *SMTPProvider) Send(ctx context.Context, notification *Notification, message *Message) error {
 	// Get SMTP configuration
 	host, _ := notification.Config["smtp_host"].(string)
@@ -42,8 +51,8 @@ func (s *SMTPProvider) Send(ctx context.Context, notification *Notification, mes
 	}
 
 	// Build email message
-	subject := message.Title
-	body := FormatMessage(message)
+	subject := sanitizeEmailContent(message.Title)
+	body := sanitizeEmailContent(FormatMessage(message))
 
 	msg := fmt.Sprintf("From: %s\r\n", from)
 	msg += fmt.Sprintf("To: %s\r\n", to)
