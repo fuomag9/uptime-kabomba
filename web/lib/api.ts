@@ -123,6 +123,10 @@ class ApiClient {
     return this.request<User>('/api/user/me');
   }
 
+  async getSetupStatus(): Promise<{ setupComplete: boolean }> {
+    return this.request<{ setupComplete: boolean }>('/api/auth/status');
+  }
+
   // Monitor endpoints
   async getMonitors(): Promise<MonitorWithStatus[]> {
     const result = await this.request<MonitorWithStatus[] | null>('/api/monitors');

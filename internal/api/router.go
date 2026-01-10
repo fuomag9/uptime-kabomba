@@ -53,6 +53,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 		r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/login", HandleLogin(db, cfg))
 		r.Post("/auth/logout", HandleLogout())
 		r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/setup", HandleSetup(db, cfg))
+		r.Get("/auth/status", HandleGetSetupStatus(db))
 
 		// Protected routes
 		r.Group(func(r chi.Router) {

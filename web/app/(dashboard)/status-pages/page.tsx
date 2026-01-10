@@ -49,14 +49,14 @@ export default function StatusPagesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Loading status pages...</div>
+        <div className="text-gray-600 dark:text-gray-400">Loading status pages...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
         {error}
       </div>
     );
@@ -66,8 +66,8 @@ export default function StatusPagesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Status Pages</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Status Pages</h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             Create public status pages for your monitors
           </p>
         </div>
@@ -80,11 +80,11 @@ export default function StatusPagesPage() {
       </div>
 
       {(!statusPages || statusPages.length === 0) ? (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-gray-600">No status pages created yet.</p>
+        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
+          <p className="text-gray-600 dark:text-gray-400">No status pages created yet.</p>
           <Link
             href="/status-pages/new"
-            className="mt-4 inline-block text-blue-600 hover:text-blue-700 font-medium"
+            className="mt-4 inline-block text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
           >
             Create your first status page
           </Link>
@@ -94,37 +94,37 @@ export default function StatusPagesPage() {
           {(statusPages || []).map((page) => (
             <div
               key={page.id}
-              className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       {page.title}
                     </h3>
                     {page.published ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
                         Published
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
                         Draft
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     {page.description || 'No description'}
                   </p>
                   <div className="mt-2 flex items-center gap-4 text-sm">
-                    <span className="text-gray-500">
-                      Slug: <span className="font-mono text-gray-700">{page.slug}</span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Slug: <span className="font-mono text-gray-700 dark:text-gray-300">{page.slug}</span>
                     </span>
                     {page.published && (
                       <a
                         href={`/status/${page.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700"
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                       >
                         View public page →
                       </a>
@@ -135,13 +135,13 @@ export default function StatusPagesPage() {
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/status-pages/${page.id}/edit`}
-                    className="text-gray-600 hover:text-gray-700 px-3 py-1 text-sm font-medium rounded border border-gray-300 hover:bg-gray-50 transition-colors"
+                    className="text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     Edit
                   </Link>
                   <button
                     onClick={() => handleDelete(page.id)}
-                    className="text-red-600 hover:text-red-700 px-3 py-1 text-sm font-medium rounded border border-red-600 hover:bg-red-50 transition-colors"
+                    className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 px-3 py-1 text-sm font-medium rounded border border-red-600 dark:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                   >
                     Delete
                   </button>

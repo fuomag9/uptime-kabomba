@@ -166,6 +166,29 @@ func HandleGetCurrentUser(db *gorm.DB) http.HandlerFunc {
 	}
 }
 
+// StatusResponse represents setup status response
+type StatusResponse struct {
+	SetupComplete bool `json:"setupComplete"`
+}
+
+// HandleGetSetupStatus checks if setup has been completed
+func HandleGetSetupStatus(db *gorm.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var count int64
+		err := db.Model(&models.User{}).Count(&count).Error
+		if err != nil {
+			log.Println("Error checking user count:", err.Error())
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(StatusResponse{
+			SetupComplete: count > 0,
+		})
+	}
+}
+
 // AuthMiddleware validates JWT tokens
 func AuthMiddleware(jwtSecret string, db *gorm.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

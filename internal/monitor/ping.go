@@ -106,7 +106,7 @@ func (p *PingMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 
 	heartbeat.Status = StatusUp
 	heartbeat.Ping = int(stats.AvgRtt.Milliseconds())
-	heartbeat.Message = fmt.Sprintf("Ping OK - %dms avg (loss: %.1f%%)", stats.AvgRtt.Milliseconds(), packetLoss)
+	heartbeat.Message = fmt.Sprintf("%dms", stats.AvgRtt.Milliseconds())
 
 	return heartbeat, nil
 }
