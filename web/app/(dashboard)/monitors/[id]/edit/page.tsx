@@ -18,7 +18,14 @@ export default function EditMonitorPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: UpdateMonitorRequest) => apiClient.updateMonitor(monitorId, data),
+    mutationFn: async (data: UpdateMonitorRequest & { notificationIds?: number[] }) => {
+      const { notificationIds, ...monitorData } = data;
+      await apiClient.updateMonitor(monitorId, monitorData);
+      // Update notifications if provided
+      if (notificationIds !== undefined) {
+        await apiClient.updateMonitorNotifications(monitorId, notificationIds);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['monitor', monitorId] });
       queryClient.invalidateQueries({ queryKey: ['monitors'] });
@@ -85,7 +92,8 @@ export default function EditMonitorPage() {
             timeout: monitor.timeout,
             config: monitor.config,
           }}
-          onSubmit={(data) => updateMutation.mutate({ ...data, active: monitor.active })}
+          monitorId={monitorId}
+          onSubmit={(data) => updateMutation.mutate({ ...data.monitor, active: monitor.active, notificationIds: data.notificationIds })}
           onCancel={() => router.push(`/monitors/${monitorId}`)}
           isSubmitting={updateMutation.isPending}
         />

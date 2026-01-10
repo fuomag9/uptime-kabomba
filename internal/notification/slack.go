@@ -33,7 +33,7 @@ func (s *SlackProvider) Send(ctx context.Context, notification *Notification, me
 
 	// Default username
 	if username == "" {
-		username = "Uptime Kuma"
+		username = "Uptime Kabomba"
 	}
 
 	// Default icon based on status
@@ -69,7 +69,7 @@ func (s *SlackProvider) Send(ctx context.Context, notification *Notification, me
 		"title":      message.Title,
 		"text":       message.Body,
 		"ts":         time.Now().Unix(),
-		"footer":     "Uptime Kuma",
+		"footer":     "Uptime Kabomba",
 		"footer_icon": "https://uptime.kuma.pet/img/icon.svg",
 		"fields":     []map[string]interface{}{},
 	}

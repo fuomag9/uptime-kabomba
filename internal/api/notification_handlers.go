@@ -238,10 +238,10 @@ func HandleTestNotification(db *gorm.DB, dispatcher *notification.Dispatcher) ht
 		user := r.Context().Value(userContextKey).(*models.User)
 		notificationID := chi.URLParam(r, "id")
 
-		// Get notification
-		var notif notification.Notification
+		// Get notification from database
+		var modelNotif models.Notification
 		err := db.Where("id = ? AND user_id = ?", notificationID, user.ID).
-			First(&notif).Error
+			First(&modelNotif).Error
 
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
@@ -253,17 +253,27 @@ func HandleTestNotification(db *gorm.DB, dispatcher *notification.Dispatcher) ht
 		}
 
 		// Parse config JSON
-		if notif.ConfigRaw != "" {
-			var config map[string]interface{}
-			if err := json.Unmarshal([]byte(notif.ConfigRaw), &config); err != nil {
+		var config map[string]interface{}
+		if modelNotif.Config != "" {
+			if err := json.Unmarshal([]byte(modelNotif.Config), &config); err != nil {
 				http.Error(w, "Invalid notification configuration", http.StatusInternalServerError)
 				return
 			}
-			notif.Config = config
+		}
+
+		// Create notification.Notification for dispatcher
+		notif := &notification.Notification{
+			ID:        modelNotif.ID,
+			UserID:    modelNotif.UserID,
+			Name:      modelNotif.Name,
+			Type:      modelNotif.Type,
+			Config:    config,
+			IsDefault: modelNotif.IsDefault,
+			Active:    modelNotif.Active,
 		}
 
 		// Send test notification
-		err = dispatcher.TestNotification(r.Context(), &notif)
+		err = dispatcher.TestNotification(r.Context(), notif)
 		if err != nil {
 			http.Error(w, "Failed to send test notification: "+err.Error(), http.StatusInternalServerError)
 			return

@@ -169,7 +169,7 @@ func (d *Dispatcher) getDefaultNotifications() ([]*Notification, error) {
 func (d *Dispatcher) TestNotification(ctx context.Context, notif *Notification) error {
 	msg := &Message{
 		Title:       "Test Notification",
-		Body:        "This is a test notification from Uptime Kuma.",
+		Body:        "This is a test notification from Uptime Kabomba.",
 		MonitorName: "Test Monitor",
 		Status:      "up",
 		Time:        time.Now().Format(time.RFC3339),

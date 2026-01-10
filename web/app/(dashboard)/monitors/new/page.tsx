@@ -10,14 +10,21 @@ export default function NewMonitorPage() {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateMonitorRequest) => apiClient.createMonitor(data),
+    mutationFn: async (data: { monitor: CreateMonitorRequest, notificationIds: number[] }) => {
+      const createdMonitor = await apiClient.createMonitor(data.monitor);
+      // Update notifications if any are selected
+      if (data.notificationIds.length > 0) {
+        await apiClient.updateMonitorNotifications(createdMonitor.id, data.notificationIds);
+      }
+      return createdMonitor;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['monitors'] });
       router.push('/monitors');
     },
   });
 
-  const handleSubmit = (data: CreateMonitorRequest) => {
+  const handleSubmit = (data: { monitor: CreateMonitorRequest, notificationIds: number[] }) => {
     createMutation.mutate(data);
   };
 

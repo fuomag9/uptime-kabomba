@@ -31,7 +31,7 @@ func (d *DiscordProvider) Send(ctx context.Context, notification *Notification, 
 
 	// Default username
 	if username == "" {
-		username = "Uptime Kuma"
+		username = "Uptime Kabomba"
 	}
 
 	// Determine color based on status

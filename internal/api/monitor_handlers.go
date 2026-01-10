@@ -321,3 +321,149 @@ func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(heartbeats)
 	}
 }
+
+// HandleGetMonitorNotifications returns all notifications linked to a specific monitor
+func HandleGetMonitorNotifications(db *gorm.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := r.Context().Value(userContextKey).(*models.User)
+		monitorIDStr := chi.URLParam(r, "id")
+
+		// Parse monitor ID
+		monitorID, err := strconv.Atoi(monitorIDStr)
+		if err != nil {
+			http.Error(w, "Invalid monitor ID", http.StatusBadRequest)
+			return
+		}
+
+		// Verify user owns monitor
+		var mon models.Monitor
+		err = db.Where("id = ? AND user_id = ?", monitorID, user.ID).First(&mon).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				http.Error(w, "Monitor not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "Failed to fetch monitor", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Get notifications linked to this monitor
+		var notifications []models.Notification
+		err = db.Table("notifications").
+			Joins("INNER JOIN monitor_notifications ON monitor_notifications.notification_id = notifications.id").
+			Where("monitor_notifications.monitor_id = ? AND notifications.user_id = ?", monitorID, user.ID).
+			Find(&notifications).Error
+
+		if err != nil {
+			http.Error(w, "Failed to fetch notifications", http.StatusInternalServerError)
+			return
+		}
+
+		// Parse config JSON for each notification
+		for i := range notifications {
+			if notifications[i].Config != "" {
+				configMap := make(map[string]interface{})
+				if err := json.Unmarshal([]byte(notifications[i].Config), &configMap); err == nil {
+					// Just verify parsing works, frontend will use the string
+				}
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(notifications)
+	}
+}
+
+// UpdateMonitorNotificationsRequest represents the request body for updating monitor notifications
+type UpdateMonitorNotificationsRequest struct {
+	NotificationIDs []int `json:"notification_ids"`
+}
+
+// HandleUpdateMonitorNotifications replaces all notification associations for a monitor
+func HandleUpdateMonitorNotifications(db *gorm.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := r.Context().Value(userContextKey).(*models.User)
+		monitorIDStr := chi.URLParam(r, "id")
+
+		// Parse monitor ID
+		monitorID, err := strconv.Atoi(monitorIDStr)
+		if err != nil {
+			http.Error(w, "Invalid monitor ID", http.StatusBadRequest)
+			return
+		}
+
+		// Parse request body
+		var req UpdateMonitorNotificationsRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		// Verify user owns monitor
+		var mon models.Monitor
+		err = db.Where("id = ? AND user_id = ?", monitorID, user.ID).First(&mon).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				http.Error(w, "Monitor not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "Failed to fetch monitor", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Verify all notification IDs belong to user
+		if len(req.NotificationIDs) > 0 {
+			var count int64
+			err = db.Model(&models.Notification{}).
+				Where("id IN ? AND user_id = ?", req.NotificationIDs, user.ID).
+				Count(&count).Error
+
+			if err != nil {
+				http.Error(w, "Failed to verify notifications", http.StatusInternalServerError)
+				return
+			}
+
+			if int(count) != len(req.NotificationIDs) {
+				http.Error(w, "One or more notification IDs are invalid", http.StatusBadRequest)
+				return
+			}
+		}
+
+		// Use transaction to replace associations
+		err = db.Transaction(func(tx *gorm.DB) error {
+			// Delete existing associations
+			if err := tx.Exec("DELETE FROM monitor_notifications WHERE monitor_id = ?", monitorID).Error; err != nil {
+				return err
+			}
+
+			// Insert new associations
+			for _, notificationID := range req.NotificationIDs {
+				if err := tx.Exec("INSERT INTO monitor_notifications (monitor_id, notification_id) VALUES (?, ?)", monitorID, notificationID).Error; err != nil {
+					return err
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			http.Error(w, "Failed to update monitor notifications", http.StatusInternalServerError)
+			return
+		}
+
+		// Return updated list of notifications
+		var notifications []models.Notification
+		err = db.Table("notifications").
+			Joins("INNER JOIN monitor_notifications ON monitor_notifications.notification_id = notifications.id").
+			Where("monitor_notifications.monitor_id = ? AND notifications.user_id = ?", monitorID, user.ID).
+			Find(&notifications).Error
+
+		if err != nil {
+			http.Error(w, "Failed to fetch updated notifications", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(notifications)
+	}
+}

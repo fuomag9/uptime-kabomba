@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from 'react';
-import { CreateMonitorRequest } from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { CreateMonitorRequest, Notification, apiClient } from '@/lib/api';
+
+interface MonitorFormData {
+  monitor: CreateMonitorRequest;
+  notificationIds: number[];
+}
 
 interface MonitorFormProps {
   initialData?: Partial<CreateMonitorRequest>;
-  onSubmit: (data: CreateMonitorRequest) => void;
+  monitorId?: number;
+  onSubmit: (data: MonitorFormData) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
 }
@@ -20,7 +26,7 @@ const MONITOR_TYPES = [
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
-export default function MonitorForm({ initialData, onSubmit, onCancel, isSubmitting }: MonitorFormProps) {
+export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel, isSubmitting }: MonitorFormProps) {
   const [formData, setFormData] = useState<CreateMonitorRequest>({
     name: initialData?.name || '',
     type: initialData?.type || 'http',
@@ -29,6 +35,10 @@ export default function MonitorForm({ initialData, onSubmit, onCancel, isSubmitt
     timeout: initialData?.timeout || 30,
     config: initialData?.config || {},
   });
+
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [selectedNotificationIds, setSelectedNotificationIds] = useState<number[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
 
   const [httpConfig, setHttpConfig] = useState({
     method: (initialData?.config?.method as string) || 'GET',
@@ -67,6 +77,26 @@ export default function MonitorForm({ initialData, onSubmit, onCancel, isSubmitt
   const [dockerConfig, setDockerConfig] = useState({
     docker_host: (initialData?.config?.docker_host as string) || '',
   });
+
+  // Load notifications on mount
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const notifs = await apiClient.getNotifications();
+        setNotifications(notifs);
+
+        if (monitorId) {
+          const linked = await apiClient.getMonitorNotifications(monitorId);
+          setSelectedNotificationIds(linked.map(n => n.id));
+        }
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
+      } finally {
+        setLoadingNotifications(false);
+      }
+    }
+    loadData();
+  }, [monitorId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,8 +151,11 @@ export default function MonitorForm({ initialData, onSubmit, onCancel, isSubmitt
     }
 
     onSubmit({
-      ...formData,
-      config,
+      monitor: {
+        ...formData,
+        config,
+      },
+      notificationIds: selectedNotificationIds,
     });
   };
 
@@ -228,6 +261,68 @@ export default function MonitorForm({ initialData, onSubmit, onCancel, isSubmitt
             />
           </div>
         </div>
+      </div>
+
+      {/* Notification Configuration */}
+      <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+          Notifications
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Select which notifications to use for this monitor. If none selected, default notifications will be used.
+        </p>
+
+        {loadingNotifications ? (
+          <div className="text-sm text-gray-500 dark:text-gray-400">Loading notifications...</div>
+        ) : (
+          <div className="space-y-2">
+            {notifications.map((notif) => (
+              <label
+                key={notif.id}
+                className="flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedNotificationIds.includes(notif.id)}
+                  onChange={(e) => {
+                    setSelectedNotificationIds(
+                      e.target.checked
+                        ? [...selectedNotificationIds, notif.id]
+                        : selectedNotificationIds.filter(id => id !== notif.id)
+                    );
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {notif.name}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                      {getProviderLabel(notif.type)}
+                    </span>
+                    {notif.is_default && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                        Default
+                      </span>
+                    )}
+                    {!notif.active && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </label>
+            ))}
+
+            {notifications.length === 0 && (
+              <div className="text-sm text-gray-500 dark:text-gray-400 p-4 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-center">
+                No notifications configured. Visit the Notifications tab to add one.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* HTTP-specific configuration */}
@@ -584,4 +679,20 @@ export default function MonitorForm({ initialData, onSubmit, onCancel, isSubmitt
       </div>
     </form>
   );
+}
+
+function getProviderLabel(type: string): string {
+  const labels: Record<string, string> = {
+    smtp: 'Email',
+    webhook: 'Webhook',
+    discord: 'Discord',
+    slack: 'Slack',
+    telegram: 'Telegram',
+    teams: 'Teams',
+    pagerduty: 'PagerDuty',
+    pushover: 'Pushover',
+    gotify: 'Gotify',
+    ntfy: 'Ntfy',
+  };
+  return labels[type] || type.toUpperCase();
 }

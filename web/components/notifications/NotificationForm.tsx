@@ -72,36 +72,36 @@ export default function NotificationForm({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-          <h2 className="text-xl font-bold text-gray-900">
+    <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
             {notification ? 'Edit Notification' : 'Add Notification'}
           </h2>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Type
             </label>
             <select
@@ -110,7 +110,7 @@ export default function NotificationForm({
                 setType(e.target.value);
                 setConfig({});
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
               {providers.map((provider) => (
@@ -131,7 +131,7 @@ export default function NotificationForm({
                 onChange={(e) => setIsDefault(e.target.checked)}
                 className="mr-2"
               />
-              <span className="text-sm text-gray-700">Default notification</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Default notification</span>
             </label>
 
             <label className="flex items-center">
@@ -141,22 +141,22 @@ export default function NotificationForm({
                 onChange={(e) => setActive(e.target.checked)}
                 className="mr-2"
               />
-              <span className="text-sm text-gray-700">Active</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Active</span>
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
               disabled={loading}
             >
               {loading ? 'Saving...' : notification ? 'Update' : 'Create'}
@@ -178,7 +178,7 @@ function renderProviderConfig(
       return (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               SMTP Host
             </label>
             <input
@@ -186,24 +186,24 @@ function renderProviderConfig(
               value={config.smtp_host || ''}
               onChange={(e) => updateConfig('smtp_host', e.target.value)}
               placeholder="smtp.gmail.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               SMTP Port
             </label>
             <input
               type="number"
               value={config.smtp_port || 587}
               onChange={(e) => updateConfig('smtp_port', parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               From Email
             </label>
             <input
@@ -211,12 +211,12 @@ function renderProviderConfig(
               value={config.from_email || ''}
               onChange={(e) => updateConfig('from_email', e.target.value)}
               placeholder="alerts@example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               To Email
             </label>
             <input
@@ -224,30 +224,30 @@ function renderProviderConfig(
               value={config.to_email || ''}
               onChange={(e) => updateConfig('to_email', e.target.value)}
               placeholder="you@example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Username (optional)
             </label>
             <input
               type="text"
               value={config.smtp_username || ''}
               onChange={(e) => updateConfig('smtp_username', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Password (optional)
             </label>
             <input
               type="password"
               value={config.smtp_password || ''}
               onChange={(e) => updateConfig('smtp_password', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             />
           </div>
         </>
@@ -257,7 +257,7 @@ function renderProviderConfig(
       return (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Webhook URL
             </label>
             <input
@@ -265,18 +265,18 @@ function renderProviderConfig(
               value={config.url || ''}
               onChange={(e) => updateConfig('url', e.target.value)}
               placeholder="https://example.com/webhook"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               HTTP Method
             </label>
             <select
               value={config.method || 'POST'}
               onChange={(e) => updateConfig('method', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             >
               <option value="POST">POST</option>
               <option value="GET">GET</option>
@@ -284,7 +284,7 @@ function renderProviderConfig(
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Headers (JSON, optional)
             </label>
             <textarea
@@ -298,7 +298,7 @@ function renderProviderConfig(
                 }
               }}
               placeholder='{"Authorization": "Bearer token"}'
-              className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md font-mono text-sm"
               rows={3}
             />
           </div>
@@ -308,7 +308,7 @@ function renderProviderConfig(
     case 'discord':
       return (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Discord Webhook URL
           </label>
           <input
@@ -316,7 +316,7 @@ function renderProviderConfig(
             value={config.webhook_url || ''}
             onChange={(e) => updateConfig('webhook_url', e.target.value)}
             placeholder="https://discord.com/api/webhooks/..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             required
           />
         </div>
@@ -326,7 +326,7 @@ function renderProviderConfig(
       return (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Slack Webhook URL
             </label>
             <input
@@ -334,12 +334,12 @@ function renderProviderConfig(
               value={config.webhook_url || ''}
               onChange={(e) => updateConfig('webhook_url', e.target.value)}
               placeholder="https://hooks.slack.com/services/..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Channel (optional, overrides webhook default)
             </label>
             <input
@@ -347,7 +347,7 @@ function renderProviderConfig(
               value={config.channel || ''}
               onChange={(e) => updateConfig('channel', e.target.value)}
               placeholder="#alerts"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             />
           </div>
         </>
@@ -357,7 +357,7 @@ function renderProviderConfig(
       return (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Bot Token
             </label>
             <input
@@ -365,12 +365,12 @@ function renderProviderConfig(
               value={config.bot_token || ''}
               onChange={(e) => updateConfig('bot_token', e.target.value)}
               placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Chat ID
             </label>
             <input
@@ -378,7 +378,7 @@ function renderProviderConfig(
               value={config.chat_id || ''}
               onChange={(e) => updateConfig('chat_id', e.target.value)}
               placeholder="-1001234567890"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
@@ -388,7 +388,7 @@ function renderProviderConfig(
     case 'teams':
       return (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Microsoft Teams Webhook URL
           </label>
           <input
@@ -396,7 +396,7 @@ function renderProviderConfig(
             value={config.webhook_url || ''}
             onChange={(e) => updateConfig('webhook_url', e.target.value)}
             placeholder="https://outlook.office.com/webhook/..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             required
           />
         </div>
@@ -405,7 +405,7 @@ function renderProviderConfig(
     case 'pagerduty':
       return (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Integration Key
           </label>
           <input
@@ -413,7 +413,7 @@ function renderProviderConfig(
             value={config.integration_key || ''}
             onChange={(e) => updateConfig('integration_key', e.target.value)}
             placeholder="Integration key from PagerDuty"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             required
           />
         </div>
@@ -423,7 +423,7 @@ function renderProviderConfig(
       return (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               User Key
             </label>
             <input
@@ -431,12 +431,12 @@ function renderProviderConfig(
               value={config.user_key || ''}
               onChange={(e) => updateConfig('user_key', e.target.value)}
               placeholder="Your Pushover user key"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               API Token
             </label>
             <input
@@ -444,7 +444,7 @@ function renderProviderConfig(
               value={config.api_token || ''}
               onChange={(e) => updateConfig('api_token', e.target.value)}
               placeholder="Your Pushover API token"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
@@ -455,7 +455,7 @@ function renderProviderConfig(
       return (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Server URL
             </label>
             <input
@@ -463,12 +463,12 @@ function renderProviderConfig(
               value={config.server_url || ''}
               onChange={(e) => updateConfig('server_url', e.target.value)}
               placeholder="https://gotify.example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               App Token
             </label>
             <input
@@ -476,7 +476,7 @@ function renderProviderConfig(
               value={config.app_token || ''}
               onChange={(e) => updateConfig('app_token', e.target.value)}
               placeholder="Application token from Gotify"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
@@ -487,7 +487,7 @@ function renderProviderConfig(
       return (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Server URL (leave empty for ntfy.sh)
             </label>
             <input
@@ -495,11 +495,11 @@ function renderProviderConfig(
               value={config.server_url || ''}
               onChange={(e) => updateConfig('server_url', e.target.value)}
               placeholder="https://ntfy.sh or your own server"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Topic
             </label>
             <input
@@ -507,30 +507,30 @@ function renderProviderConfig(
               value={config.topic || ''}
               onChange={(e) => updateConfig('topic', e.target.value)}
               placeholder="my-uptime-alerts"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Username (optional, for authentication)
             </label>
             <input
               type="text"
               value={config.username || ''}
               onChange={(e) => updateConfig('username', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Password (optional, for authentication)
             </label>
             <input
               type="password"
               value={config.password || ''}
               onChange={(e) => updateConfig('password', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md"
             />
           </div>
         </>

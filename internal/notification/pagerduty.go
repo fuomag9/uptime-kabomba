@@ -64,7 +64,7 @@ func (p *PagerDutyProvider) Send(ctx context.Context, notification *Notification
 		"dedup_key":    fmt.Sprintf("uptime-kuma-%s", message.MonitorName),
 		"payload": map[string]interface{}{
 			"summary":        message.Title,
-			"source":         "Uptime Kuma",
+			"source":         "Uptime Kabomba",
 			"severity":       severity,
 			"timestamp":      message.Time,
 			"custom_details": customDetails,

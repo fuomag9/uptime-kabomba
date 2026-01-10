@@ -69,6 +69,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 			r.Put("/monitors/{id}", HandleUpdateMonitor(db, executor))
 			r.Delete("/monitors/{id}", HandleDeleteMonitor(db, executor))
 			r.Get("/monitors/{id}/heartbeats", HandleGetHeartbeats(db))
+			r.Get("/monitors/{id}/notifications", HandleGetMonitorNotifications(db))
+			r.Put("/monitors/{id}/notifications", HandleUpdateMonitorNotifications(db))
 			r.Get("/monitors/{id}/uptime", HandleGetMonitorUptime(db))
 			r.Get("/monitors/{id}/uptime/history", HandleGetMonitorUptimeHistory(db))
 			r.Get("/monitors/{id}/uptime/hourly", HandleGetMonitorHourlyUptime(db))

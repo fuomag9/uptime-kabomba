@@ -157,6 +157,26 @@ class ApiClient {
     });
   }
 
+  async getMonitorNotifications(monitorId: number): Promise<Notification[]> {
+    const result = await this.request<Notification[] | null>(
+      `/api/monitors/${monitorId}/notifications`
+    );
+    return result || [];
+  }
+
+  async updateMonitorNotifications(
+    monitorId: number,
+    notificationIds: number[]
+  ): Promise<Notification[]> {
+    return this.request<Notification[]>(
+      `/api/monitors/${monitorId}/notifications`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ notification_ids: notificationIds }),
+      }
+    );
+  }
+
   async getHeartbeats(monitorId: number, limit?: number): Promise<Heartbeat[]> {
     const params = limit ? `?limit=${limit}` : '';
     const result = await this.request<Heartbeat[] | null>(`/api/monitors/${monitorId}/heartbeats${params}`);
@@ -287,6 +307,10 @@ export interface CreateMonitorRequest {
 
 export interface UpdateMonitorRequest extends CreateMonitorRequest {
   active?: boolean;
+}
+
+export interface MonitorNotificationLink {
+  notification_ids: number[];
 }
 
 export interface Heartbeat {
