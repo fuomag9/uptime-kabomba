@@ -63,6 +63,10 @@ func (p *PingMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 		pinger.SetPrivileged(true)
 	}
 
+	// Set IP version preference
+	network := GetNetworkForIPVersion("ip", monitor.IPVersion)
+	pinger.SetNetwork(network)
+
 	// Run ping with context support
 	done := make(chan error, 1)
 	go func() {

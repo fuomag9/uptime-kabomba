@@ -46,9 +46,12 @@ func (t *TCPMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, e
 		Timeout: time.Duration(monitor.Timeout) * time.Second,
 	}
 
+	// Determine network based on IP version preference
+	network := GetNetworkForIPVersion("tcp", monitor.IPVersion)
+
 	// Measure connection time
 	start := time.Now()
-	conn, err := dialer.DialContext(ctx, "tcp", address)
+	conn, err := dialer.DialContext(ctx, network, address)
 	ping := time.Since(start).Milliseconds()
 
 	if err != nil {

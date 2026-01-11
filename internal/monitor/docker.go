@@ -3,6 +3,8 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
 	"time"
 
 	"github.com/docker/docker/client"
@@ -38,18 +40,35 @@ func (d *DockerMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat
 		dockerHost = host
 	}
 
-	// Create Docker client
+	// Create custom HTTP client with IP version support
+	httpClient := &http.Client{
+		Timeout: time.Duration(monitor.Timeout) * time.Second,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				// Determine network based on IP version preference
+				network = GetNetworkForIPVersion(network, monitor.IPVersion)
+				dialer := &net.Dialer{
+					Timeout: time.Duration(monitor.Timeout) * time.Second,
+				}
+				return dialer.DialContext(ctx, network, addr)
+			},
+		},
+	}
+
+	// Create Docker client with custom HTTP client
 	var cli *client.Client
 	var err error
 
 	if dockerHost != "" {
 		cli, err = client.NewClientWithOpts(
 			client.WithHost(dockerHost),
+			client.WithHTTPClient(httpClient),
 			client.WithAPIVersionNegotiation(),
 		)
 	} else {
 		cli, err = client.NewClientWithOpts(
 			client.FromEnv,
+			client.WithHTTPClient(httpClient),
 			client.WithAPIVersionNegotiation(),
 		)
 	}

@@ -17,6 +17,7 @@ type Monitor struct {
 	Interval       int                    `json:"interval" gorm:"default:60"`        // seconds
 	Timeout        int                    `json:"timeout" gorm:"default:30"`         // seconds
 	ResendInterval int                    `json:"resend_interval" gorm:"default:1"`  // send notification after X consecutive failures
+	IPVersion      string                 `json:"ip_version" gorm:"default:'auto'"`  // auto, ipv4, ipv6
 	Active         bool                   `json:"active" gorm:"default:true;index"`
 	Config         map[string]interface{} `json:"config" gorm:"-"`
 	ConfigRaw      string                 `json:"-" gorm:"column:config;type:text"`

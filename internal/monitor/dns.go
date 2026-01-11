@@ -50,22 +50,25 @@ func (d *DNSMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, e
 		expectedResult = expected
 	}
 
-	// Create resolver
-	resolver := &net.Resolver{}
-	if dnsServer != "" {
-		// Use custom DNS server
-		if !strings.Contains(dnsServer, ":") {
-			dnsServer = dnsServer + ":53"
-		}
-		resolver = &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				d := net.Dialer{
-					Timeout: time.Duration(monitor.Timeout) * time.Second,
+	// Create resolver with IP version support
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			// Determine network based on IP version preference
+			network = GetNetworkForIPVersion(network, monitor.IPVersion)
+			d := net.Dialer{
+				Timeout: time.Duration(monitor.Timeout) * time.Second,
+			}
+			// Use custom DNS server if specified, otherwise use default
+			if dnsServer != "" {
+				targetServer := dnsServer
+				if !strings.Contains(targetServer, ":") {
+					targetServer = targetServer + ":53"
 				}
-				return d.DialContext(ctx, network, dnsServer)
-			},
-		}
+				return d.DialContext(ctx, network, targetServer)
+			}
+			return d.DialContext(ctx, network, address)
+		},
 	}
 
 	// Create context with timeout

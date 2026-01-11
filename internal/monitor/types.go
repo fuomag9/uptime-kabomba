@@ -30,6 +30,7 @@ type Monitor struct {
 	Interval       int                    `json:"interval" gorm:"default:60"`        // seconds
 	Timeout        int                    `json:"timeout" gorm:"default:30"`         // seconds
 	ResendInterval int                    `json:"resend_interval" gorm:"default:1"`  // send notification after X consecutive failures
+	IPVersion      string                 `json:"ip_version" gorm:"default:'auto'"`  // auto, ipv4, ipv6
 	Active         bool                   `json:"active" gorm:"default:true;index"`
 	Config         map[string]interface{} `json:"config" gorm:"-"`                      // Type-specific config (not from DB)
 	ConfigRaw      string                 `json:"-" gorm:"column:config;type:text"`     // JSON storage
@@ -103,4 +104,43 @@ func GetMonitorType(name string) (MonitorType, bool) {
 // GetAllMonitorTypes returns all registered monitor types
 func GetAllMonitorTypes() map[string]MonitorType {
 	return monitorTypes
+}
+
+// GetNetworkForIPVersion returns the appropriate network string for dial/lookup operations
+// based on the monitor's IP version preference
+func GetNetworkForIPVersion(baseNetwork string, ipVersion string) string {
+	// If auto or empty, return the base network (default behavior)
+	if ipVersion == "" || ipVersion == "auto" {
+		return baseNetwork
+	}
+
+	// Force IPv4
+	if ipVersion == "ipv4" {
+		switch baseNetwork {
+		case "tcp":
+			return "tcp4"
+		case "udp":
+			return "udp4"
+		case "ip":
+			return "ip4"
+		default:
+			return baseNetwork
+		}
+	}
+
+	// Force IPv6
+	if ipVersion == "ipv6" {
+		switch baseNetwork {
+		case "tcp":
+			return "tcp6"
+		case "udp":
+			return "udp6"
+		case "ip":
+			return "ip6"
+		default:
+			return baseNetwork
+		}
+	}
+
+	return baseNetwork
 }

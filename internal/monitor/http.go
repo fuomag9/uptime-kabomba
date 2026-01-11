@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -67,10 +68,18 @@ func (h *HTTPMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 	ignoreTLS := h.getConfigBool(monitor, "ignore_tls", false)
 	followRedirects := h.getConfigBool(monitor, "follow_redirects", true)
 
-	// Create HTTP client
+	// Create HTTP client with IP version support
 	client := &http.Client{
 		Timeout: time.Duration(monitor.Timeout) * time.Second,
 		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				// Determine network based on IP version preference
+				network = GetNetworkForIPVersion(network, monitor.IPVersion)
+				dialer := &net.Dialer{
+					Timeout: time.Duration(monitor.Timeout) * time.Second,
+				}
+				return dialer.DialContext(ctx, network, addr)
+			},
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: ignoreTLS,
 			},

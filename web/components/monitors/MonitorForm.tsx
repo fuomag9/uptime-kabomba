@@ -34,6 +34,7 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
     interval: initialData?.interval || 60,
     timeout: initialData?.timeout || 30,
     resend_interval: initialData?.resend_interval || 1,
+    ip_version: initialData?.ip_version || 'auto',
     config: initialData?.config || {},
   });
 
@@ -280,6 +281,25 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
             Notification will be sent after {formData.resend_interval || 1} consecutive failure{(formData.resend_interval || 1) > 1 ? 's' : ''},
             then resent every {formData.resend_interval || 1} failure{(formData.resend_interval || 1) > 1 ? 's' : ''} after that.
             Set to 1 to receive notification on every failure.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="ip_version" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            IP Version
+          </label>
+          <select
+            id="ip_version"
+            value={formData.ip_version}
+            onChange={(e) => setFormData({ ...formData, ip_version: e.target.value })}
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
+          >
+            <option value="auto">Auto (IPv4/IPv6)</option>
+            <option value="ipv4">IPv4 Only</option>
+            <option value="ipv6">IPv6 Only</option>
+          </select>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Choose which IP protocol to use for network connections. Auto will try both IPv4 and IPv6.
           </p>
         </div>
       </div>
