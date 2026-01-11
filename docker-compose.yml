@@ -17,6 +17,7 @@ services:
       - OAUTH_ISSUER=${OAUTH_ISSUER}
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - OAUTH_REDIRECT_URL=${OAUTH_REDIRECT_URL}
       - OAUTH_SCOPES=${OAUTH_SCOPES:-openid,profile,email}
     # Grant CAP_NET_RAW capability for ICMP ping (raw sockets)
     # This allows ping to work without running as root

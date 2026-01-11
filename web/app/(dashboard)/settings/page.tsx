@@ -28,8 +28,8 @@ export default function SettingsPage() {
   }, []);
 
   const handleLinkOAuth = () => {
-    // Redirect to OAuth authorization endpoint
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/auth/oauth/authorize`;
+    // Redirect to OAuth authorization endpoint (use relative URL)
+    window.location.href = '/api/auth/oauth/authorize';
   };
 
   if (loading) {

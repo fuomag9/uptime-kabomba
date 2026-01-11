@@ -29,9 +29,9 @@ export default function OAuthCallbackContent() {
       }
 
       try {
-        // Call backend callback endpoint
+        // Call backend callback endpoint (use relative URL for Next.js proxy)
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/auth/oauth/callback?code=${code}&state=${state}`
+          `/api/auth/oauth/callback?code=${code}&state=${state}`
         );
 
         if (!response.ok) {

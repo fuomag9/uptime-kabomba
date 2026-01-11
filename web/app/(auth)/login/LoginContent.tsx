@@ -66,7 +66,8 @@ export default function LoginContent() {
 
   const handleOAuthLogin = () => {
     // Redirect to OAuth authorization endpoint
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/auth/oauth/authorize`;
+    // Use relative URL since Next.js rewrites proxy /api/* to backend
+    window.location.href = '/api/auth/oauth/authorize';
   };
 
   const handleLinkAccount = async (e: React.FormEvent) => {

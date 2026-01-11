@@ -1,6 +1,13 @@
 // WebSocket client for real-time updates
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws';
+function getWebSocketURL(): string {
+  if (typeof window === 'undefined') return '';
+
+  // Use the same host as the frontend, but with ws/wss protocol
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}/ws`;
+}
 
 export interface WebSocketMessage {
   type: string;
@@ -20,7 +27,8 @@ export class WebSocketClient {
   connect(token?: string) {
     if (typeof window === 'undefined') return; // Don't connect on server side
 
-    const url = token ? `${WS_URL}?token=${token}` : WS_URL;
+    const wsUrl = getWebSocketURL();
+    const url = token ? `${wsUrl}?token=${token}` : wsUrl;
 
     try {
       this.ws = new WebSocket(url);
