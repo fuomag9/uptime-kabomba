@@ -33,6 +33,7 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
     url: initialData?.url || '',
     interval: initialData?.interval || 60,
     timeout: initialData?.timeout || 30,
+    resend_interval: initialData?.resend_interval || 1,
     config: initialData?.config || {},
   });
 
@@ -260,6 +261,26 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
               className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
             />
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="resend_interval" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Resend Notification After X Consecutive Failures
+          </label>
+          <input
+            type="number"
+            id="resend_interval"
+            value={formData.resend_interval}
+            onChange={(e) => setFormData({ ...formData, resend_interval: parseInt(e.target.value) })}
+            min={1}
+            required
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
+          />
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Notification will be sent after {formData.resend_interval || 1} consecutive failure{(formData.resend_interval || 1) > 1 ? 's' : ''},
+            then resent every {formData.resend_interval || 1} failure{(formData.resend_interval || 1) > 1 ? 's' : ''} after that.
+            Set to 1 to receive notification on every failure.
+          </p>
         </div>
       </div>
 

@@ -9,18 +9,19 @@ import (
 
 // Monitor represents a monitor configuration
 type Monitor struct {
-	ID        int                    `json:"id" gorm:"primaryKey;autoIncrement"`
-	UserID    int                    `json:"user_id" gorm:"not null;index"`
-	Name      string                 `json:"name" gorm:"not null"`
-	Type      string                 `json:"type" gorm:"not null;index"`
-	URL       string                 `json:"url"`
-	Interval  int                    `json:"interval" gorm:"default:60"` // seconds
-	Timeout   int                    `json:"timeout" gorm:"default:30"`  // seconds
-	Active    bool                   `json:"active" gorm:"default:true;index"`
-	Config    map[string]interface{} `json:"config" gorm:"-"`
-	ConfigRaw string                 `json:"-" gorm:"column:config;type:text"`
-	CreatedAt time.Time              `json:"created_at"`
-	UpdatedAt time.Time              `json:"updated_at"`
+	ID             int                    `json:"id" gorm:"primaryKey;autoIncrement"`
+	UserID         int                    `json:"user_id" gorm:"not null;index"`
+	Name           string                 `json:"name" gorm:"not null"`
+	Type           string                 `json:"type" gorm:"not null;index"`
+	URL            string                 `json:"url"`
+	Interval       int                    `json:"interval" gorm:"default:60"`        // seconds
+	Timeout        int                    `json:"timeout" gorm:"default:30"`         // seconds
+	ResendInterval int                    `json:"resend_interval" gorm:"default:1"`  // send notification after X consecutive failures
+	Active         bool                   `json:"active" gorm:"default:true;index"`
+	Config         map[string]interface{} `json:"config" gorm:"-"`
+	ConfigRaw      string                 `json:"-" gorm:"column:config;type:text"`
+	CreatedAt      time.Time              `json:"created_at"`
+	UpdatedAt      time.Time              `json:"updated_at"`
 
 	// Relationships (optional, for eager loading)
 	User          User           `json:"-" gorm:"foreignKey:UserID"`

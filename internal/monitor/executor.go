@@ -22,11 +22,12 @@ type Executor struct {
 
 // monitorJob represents a running monitor job
 type monitorJob struct {
-	monitor    *Monitor
-	ticker     *time.Ticker
-	stop       chan bool
-	executor   *Executor
-	lastStatus int // Track last status for change detection
+	monitor            *Monitor
+	ticker             *time.Ticker
+	stop               chan bool
+	executor           *Executor
+	lastStatus         int // Track last status for change detection
+	consecutiveFailures int // Track consecutive down statuses
 }
 
 // NewExecutor creates a new monitor executor
@@ -170,26 +171,53 @@ func (job *monitorJob) runCheck() {
 	// Detect status changes and send notifications
 	if job.executor.dispatcher != nil {
 		ctx := context.Background()
+		monitorURL := "" // TODO: Generate monitor URL when status pages are implemented
 
-		// Monitor went down (from up to down)
-		if job.lastStatus == StatusUp && heartbeat.Status == StatusDown {
-			monitorURL := "" // TODO: Generate monitor URL when status pages are implemented
-			err := job.executor.dispatcher.NotifyMonitorDown(ctx, monitor.ID, monitor.Name, monitorURL, heartbeat.Ping, heartbeat.Message)
-			if err != nil {
-				log.Printf("Failed to send down notification for monitor %d: %v", monitor.ID, err)
-			} else {
-				log.Printf("Sent DOWN notification for monitor %s (ID: %d)", monitor.Name, monitor.ID)
+		// Track consecutive failures for resend logic
+		if heartbeat.Status == StatusDown {
+			job.consecutiveFailures++
+
+			// Determine if we should send notification based on resend_interval
+			resendInterval := monitor.ResendInterval
+			if resendInterval < 1 {
+				resendInterval = 1 // Ensure minimum of 1
 			}
-		}
 
-		// Monitor came back up (from down to up)
-		if job.lastStatus == StatusDown && heartbeat.Status == StatusUp {
-			monitorURL := ""
-			err := job.executor.dispatcher.NotifyMonitorUp(ctx, monitor.ID, monitor.Name, monitorURL, heartbeat.Ping, heartbeat.Message)
-			if err != nil {
-				log.Printf("Failed to send up notification for monitor %d: %v", monitor.ID, err)
+			shouldNotify := false
+			if job.consecutiveFailures == resendInterval {
+				// First notification after reaching threshold
+				shouldNotify = true
+			} else if job.consecutiveFailures > resendInterval {
+				// Resend notification: check if it's time to resend
+				// After threshold is reached, resend every resend_interval failures
+				if (job.consecutiveFailures-resendInterval)%resendInterval == 0 {
+					shouldNotify = true
+				}
+			}
+
+			if shouldNotify {
+				err := job.executor.dispatcher.NotifyMonitorDown(ctx, monitor.ID, monitor.Name, monitorURL, heartbeat.Ping, heartbeat.Message)
+				if err != nil {
+					log.Printf("Failed to send down notification for monitor %d: %v", monitor.ID, err)
+				} else {
+					log.Printf("Sent DOWN notification for monitor %s (ID: %d) after %d consecutive failures",
+						monitor.Name, monitor.ID, job.consecutiveFailures)
+				}
 			} else {
-				log.Printf("Sent UP notification for monitor %s (ID: %d)", monitor.Name, monitor.ID)
+				log.Printf("Monitor %s (ID: %d) is down (%d consecutive failures), waiting for threshold %d",
+					monitor.Name, monitor.ID, job.consecutiveFailures, resendInterval)
+			}
+		} else if heartbeat.Status == StatusUp {
+			// Monitor came back up - reset consecutive failures and send notification if was down
+			if job.consecutiveFailures > 0 {
+				err := job.executor.dispatcher.NotifyMonitorUp(ctx, monitor.ID, monitor.Name, monitorURL, heartbeat.Ping, heartbeat.Message)
+				if err != nil {
+					log.Printf("Failed to send up notification for monitor %d: %v", monitor.ID, err)
+				} else {
+					log.Printf("Sent UP notification for monitor %s (ID: %d) after %d failures",
+						monitor.Name, monitor.ID, job.consecutiveFailures)
+				}
+				job.consecutiveFailures = 0 // Reset counter
 			}
 		}
 	}

@@ -325,6 +325,7 @@ export interface Monitor {
   url: string;
   interval: number;
   timeout: number;
+  resend_interval: number;
   active: boolean;
   config: Record<string, any>;
   created_at: string;
@@ -337,6 +338,7 @@ export interface CreateMonitorRequest {
   url: string;
   interval?: number;
   timeout?: number;
+  resend_interval?: number;
   config?: Record<string, any>;
 }
 
