@@ -42,8 +42,8 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	// Initialize WebSocket hub
-	hub := websocket.NewHub(cfg.JWTSecret)
+	// Initialize WebSocket hub with allowed origins for security
+	hub := websocket.NewHub(cfg.JWTSecret, cfg.CORSOrigins)
 	go hub.Run()
 
 	// Initialize notification dispatcher

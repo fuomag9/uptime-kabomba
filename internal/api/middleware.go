@@ -5,35 +5,40 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fuomag9/uptime-kabomba/internal/config"
 	"golang.org/x/time/rate"
 )
 
 // SecurityHeadersMiddleware adds security headers to all responses
-func SecurityHeadersMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Prevent clickjacking
-		w.Header().Set("X-Frame-Options", "DENY")
+func SecurityHeadersMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Prevent clickjacking
+			w.Header().Set("X-Frame-Options", "DENY")
 
-		// Prevent MIME sniffing
-		w.Header().Set("X-Content-Type-Options", "nosniff")
+			// Prevent MIME sniffing
+			w.Header().Set("X-Content-Type-Options", "nosniff")
 
-		// XSS Protection
-		w.Header().Set("X-XSS-Protection", "1; mode=block")
+			// XSS Protection
+			w.Header().Set("X-XSS-Protection", "1; mode=block")
 
-		// Content Security Policy
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss:;")
+			// Content Security Policy
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss:;")
 
-		// Referrer Policy
-		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			// Referrer Policy
+			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
-		// Permissions Policy
-		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+			// Permissions Policy
+			w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 
-		// HSTS - only in production with HTTPS
-		// w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			// HSTS - enable in production
+			if cfg.Environment == "production" {
+				w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+			}
 
-		next.ServeHTTP(w, r)
-	})
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // RateLimiter stores rate limiters per identifier (IP or user)

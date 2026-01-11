@@ -59,13 +59,13 @@ docker-compose up -d
 
 # Access the web UI
 open http://localhost:3000
-
-# Backend API runs on http://localhost:8080
 ```
 
 The system runs two services:
-- **Frontend**: Next.js dev server on port 3000
-- **Backend**: Go API server on port 8080
+- **Frontend**: Next.js server on port 3000 (publicly accessible)
+- **Backend**: Go API server (only accessible via Docker internal network)
+
+**Architecture**: The backend is NOT exposed to the host - all API requests are proxied through the Next.js frontend. This ensures the backend is never directly accessible to users, improving security.
 
 **Useful Commands:**
 ```bash
@@ -123,7 +123,7 @@ npm start
 |----------|---------|-------------|
 | `DATABASE_TYPE` | `sqlite` | Database type (sqlite, postgres) |
 | `DATABASE_DSN` | `./data/uptime.db` | Database connection string |
-| `PORT` | `8080` | Server port |
+| `PORT` | `8080` | Backend internal port (not exposed to host) |
 | `JWT_SECRET` | *required* | Secret key for JWT tokens |
 
 ### Database Connection Strings
@@ -153,9 +153,9 @@ POST /api/auth/login
 
 **API Key:**
 ```bash
-curl -H "X-API-Key: your-api-key" http://localhost:8080/api/monitors
+curl -H "X-API-Key: your-api-key" http://localhost:3000/api/monitors
 # Or
-curl -H "Authorization: Bearer your-api-key" http://localhost:8080/api/monitors
+curl -H "Authorization: Bearer your-api-key" http://localhost:3000/api/monitors
 ```
 
 ### Monitor Endpoints

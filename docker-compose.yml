@@ -4,8 +4,7 @@ services:
     build: .
     image: uptime-kabomba-go:latest
     container_name: uptime-kabomba-backend
-    ports:
-      - "8080:8080"
+    # No ports exposed - only accessible via Docker internal network
     volumes:
       - uptime-data:/data
     environment:
@@ -14,7 +13,7 @@ services:
       - PORT=8080
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
       - OAUTH_ISSUER=${OAUTH_ISSUER}
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
@@ -41,7 +40,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      # Empty string means API calls use relative URLs (proxied through Next.js)
+      - NEXT_PUBLIC_API_URL=
+      - INTERNAL_API_URL=http://backend:8080
     restart: unless-stopped
     depends_on:
       - backend

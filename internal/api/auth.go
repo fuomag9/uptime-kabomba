@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -200,8 +201,16 @@ func AuthMiddleware(jwtSecret string, db *gorm.DB) func(http.Handler) http.Handl
 				return
 			}
 
-			// Parse token
+			// Parse token with algorithm validation
 			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+				// Validate the algorithm is HMAC
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				// Only accept HS256
+				if token.Method.Alg() != "HS256" {
+					return nil, fmt.Errorf("unexpected signing algorithm: %v", token.Method.Alg())
+				}
 				return []byte(jwtSecret), nil
 			})
 
@@ -211,6 +220,18 @@ func AuthMiddleware(jwtSecret string, db *gorm.DB) func(http.Handler) http.Handl
 			}
 
 			claims := token.Claims.(jwt.MapClaims)
+
+			// Explicitly validate expiry
+			if exp, ok := claims["exp"].(float64); ok {
+				if time.Now().Unix() > int64(exp) {
+					http.Error(w, "Token expired", http.StatusUnauthorized)
+					return
+				}
+			} else {
+				http.Error(w, "Token has no expiry", http.StatusUnauthorized)
+				return
+			}
+
 			userID := int(claims["user_id"].(float64))
 
 			// Load user from database
@@ -219,6 +240,12 @@ func AuthMiddleware(jwtSecret string, db *gorm.DB) func(http.Handler) http.Handl
 			if err != nil {
 				log.Println("AuthMiddleware: Failed to load user:", err.Error())
 				http.Error(w, "Invalid token", http.StatusUnauthorized)
+				return
+			}
+
+			// Check if user is active
+			if !user.Active {
+				http.Error(w, "Account disabled", http.StatusUnauthorized)
 				return
 			}
 

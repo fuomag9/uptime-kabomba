@@ -3,10 +3,12 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"nhooyr.io/websocket"
@@ -28,22 +30,24 @@ type Client struct {
 
 // Hub maintains active clients and broadcasts messages
 type Hub struct {
-	clients    map[*Client]bool
-	broadcast  chan []byte
-	register   chan *Client
-	unregister chan *Client
-	mu         sync.RWMutex
-	jwtSecret  string
+	clients       map[*Client]bool
+	broadcast     chan []byte
+	register      chan *Client
+	unregister    chan *Client
+	mu            sync.RWMutex
+	jwtSecret     string
+	allowedOrigins []string
 }
 
 // NewHub creates a new Hub
-func NewHub(jwtSecret string) *Hub {
+func NewHub(jwtSecret string, allowedOrigins []string) *Hub {
 	return &Hub{
-		clients:    make(map[*Client]bool),
-		broadcast:  make(chan []byte, 256),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		jwtSecret:  jwtSecret,
+		clients:       make(map[*Client]bool),
+		broadcast:     make(chan []byte, 256),
+		register:      make(chan *Client),
+		unregister:    make(chan *Client),
+		jwtSecret:     jwtSecret,
+		allowedOrigins: allowedOrigins,
 	}
 }
 
@@ -114,39 +118,54 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate JWT token
+	// Validate JWT token with algorithm check
 	userID := ""
 	if token != "" {
 		parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+			// Validate the algorithm is HMAC
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			// Only accept HS256
+			if token.Method.Alg() != "HS256" {
+				return nil, fmt.Errorf("unexpected signing algorithm: %v", token.Method.Alg())
+			}
 			return []byte(h.jwtSecret), nil
 		})
 
 		if err == nil && parsedToken.Valid {
 			claims := parsedToken.Claims.(jwt.MapClaims)
+
+			// Explicitly validate expiry
+			if exp, ok := claims["exp"].(float64); ok {
+				if time.Now().Unix() > int64(exp) {
+					log.Printf("WebSocket JWT token expired from %s", r.RemoteAddr)
+					http.Error(w, "Token expired", http.StatusUnauthorized)
+					return
+				}
+			}
+
 			if uid, ok := claims["user_id"].(float64); ok {
 				userID = string(rune(int(uid)))
 			}
 		}
 	}
 
-	// For now, allow anonymous connections but log a warning
+	// Require authentication for WebSocket connections
 	if userID == "" {
-		log.Printf("WebSocket connection without authentication from %s", r.RemoteAddr)
-		// In production, you may want to reject unauthenticated connections:
-		// http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		// return
+		log.Printf("WebSocket connection rejected: no valid authentication from %s", r.RemoteAddr)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 
-	// Verify origin to prevent CSRF
-	origin := r.Header.Get("Origin")
-	if origin != "" {
-		// TODO: Verify origin against allowed origins from config
-		// For now, log it
-		log.Printf("WebSocket connection from origin: %s", origin)
+	// Use configured allowed origins (same as CORS)
+	allowedOrigins := h.allowedOrigins
+	if len(allowedOrigins) == 0 {
+		allowedOrigins = []string{"http://localhost:3000"}
 	}
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"*"}, // TODO: Configure allowed origins
+		OriginPatterns: allowedOrigins,
 	})
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)

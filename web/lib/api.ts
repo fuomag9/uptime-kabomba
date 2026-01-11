@@ -1,6 +1,8 @@
 // API client for backend communication
+// In production (Docker), API requests are proxied through Next.js to backend
+// In development, you can set NEXT_PUBLIC_API_URL to http://localhost:8080
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export interface LoginRequest {
   username: string;

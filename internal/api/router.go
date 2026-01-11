@@ -38,15 +38,23 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 	}))
 
 	// Security headers
-	r.Use(SecurityHeadersMiddleware)
+	r.Use(SecurityHeadersMiddleware(cfg))
+
+	// Request body size limit (10MB)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10MB limit
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	// Global rate limiter - 100 requests per minute per IP
 	globalLimiter := NewRateLimiter(100.0/60.0, 20)
 	globalLimiter.CleanupOldLimiters()
 	r.Use(RateLimitMiddleware(globalLimiter))
 
-	// Strict rate limiter for auth endpoints - 5 requests per 15 minutes
-	authLimiter := NewRateLimiter(5.0/900.0, 5)
+	// Strict rate limiter for auth endpoints - 5 requests per 15 minutes, burst of 2
+	authLimiter := NewRateLimiter(5.0/900.0, 2)
 	authLimiter.CleanupOldLimiters()
 
 	// Initialize OAuth client if enabled

@@ -179,15 +179,25 @@ func APIKeyAuthMiddleware(db *gorm.DB) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Get all API keys (we need to hash check each one)
+			// Validate key length
+			if len(apiKey) < 8 {
+				http.Error(w, "Invalid API key format", http.StatusUnauthorized)
+				return
+			}
+
+			// Extract prefix from provided key (first 8 chars)
+			prefix := apiKey[:8]
+
+			// Query only keys matching this prefix (performance optimization)
+			// This reduces bcrypt comparisons from O(n) to O(1-2) typically
 			var apiKeys []models.APIKey
-			err := db.Find(&apiKeys).Error
+			err := db.Where("prefix = ?", prefix).Find(&apiKeys).Error
 			if err != nil {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 
-			// Find matching key
+			// Find matching key (now only checking 1-2 keys instead of all)
 			var matchedKey *models.APIKey
 			for i := range apiKeys {
 				if err := bcrypt.CompareHashAndPassword([]byte(apiKeys[i].KeyHash), []byte(apiKey)); err == nil {
