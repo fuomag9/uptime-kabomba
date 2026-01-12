@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -10,6 +11,15 @@ import (
 	"github.com/fuomag9/uptime-kabomba/internal/models"
 	"github.com/fuomag9/uptime-kabomba/internal/uptime"
 )
+
+// escapePrometheusLabel escapes special characters in Prometheus label values
+func escapePrometheusLabel(s string) string {
+	// Replace backslashes first, then quotes and newlines
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	return s
+}
 
 // HandlePrometheusMetrics exports metrics in Prometheus format
 func HandlePrometheusMetrics(db *gorm.DB) http.HandlerFunc {
@@ -55,7 +65,7 @@ func HandlePrometheusMetrics(db *gorm.DB) http.HandlerFunc {
 		// Write metrics for each monitor
 		for _, monitor := range monitors {
 			labels := fmt.Sprintf(`monitor_id="%d",monitor_name="%s",monitor_type="%s",user_id="%d"`,
-				monitor.ID, monitor.Name, monitor.Type, monitor.UserID)
+				monitor.ID, escapePrometheusLabel(monitor.Name), escapePrometheusLabel(monitor.Type), monitor.UserID)
 
 			// Get latest heartbeat
 			var heartbeat models.Heartbeat
