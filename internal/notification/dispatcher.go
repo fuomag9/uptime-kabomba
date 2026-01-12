@@ -115,14 +115,41 @@ func (d *Dispatcher) getMonitorNotifications(monitorID int) ([]*Notification, er
 		WHERE mn.monitor_id = ? AND n.active = true
 	`
 
-	var notifications []*Notification
-	err := d.db.Raw(query, monitorID).Scan(&notifications).Error
+	// Use a temporary struct to avoid GORM's issues with map fields
+	type NotificationRow struct {
+		ID        int    `gorm:"column:id"`
+		UserID    int    `gorm:"column:user_id"`
+		Name      string `gorm:"column:name"`
+		Type      string `gorm:"column:type"`
+		ConfigRaw string `gorm:"column:config"`
+		IsDefault bool   `gorm:"column:is_default"`
+		Active    bool   `gorm:"column:active"`
+		CreatedAt string `gorm:"column:created_at"`
+		UpdatedAt string `gorm:"column:updated_at"`
+	}
+
+	var rows []NotificationRow
+	err := d.db.Raw(query, monitorID).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
 
-	// Parse config JSON for each notification
-	for _, notif := range notifications {
+	// Convert rows to Notification structs
+	notifications := make([]*Notification, 0, len(rows))
+	for _, row := range rows {
+		notif := &Notification{
+			ID:        row.ID,
+			UserID:    row.UserID,
+			Name:      row.Name,
+			Type:      row.Type,
+			ConfigRaw: row.ConfigRaw,
+			IsDefault: row.IsDefault,
+			Active:    row.Active,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+		}
+
+		// Parse config JSON
 		if notif.ConfigRaw != "" {
 			var config map[string]interface{}
 			if err := json.Unmarshal([]byte(notif.ConfigRaw), &config); err != nil {
@@ -131,6 +158,8 @@ func (d *Dispatcher) getMonitorNotifications(monitorID int) ([]*Notification, er
 			}
 			notif.Config = config
 		}
+
+		notifications = append(notifications, notif)
 	}
 
 	return notifications, nil
@@ -144,14 +173,41 @@ func (d *Dispatcher) getDefaultNotifications() ([]*Notification, error) {
 		WHERE is_default = true AND active = true
 	`
 
-	var notifications []*Notification
-	err := d.db.Raw(query).Scan(&notifications).Error
+	// Use a temporary struct to avoid GORM's issues with map fields
+	type NotificationRow struct {
+		ID        int    `gorm:"column:id"`
+		UserID    int    `gorm:"column:user_id"`
+		Name      string `gorm:"column:name"`
+		Type      string `gorm:"column:type"`
+		ConfigRaw string `gorm:"column:config"`
+		IsDefault bool   `gorm:"column:is_default"`
+		Active    bool   `gorm:"column:active"`
+		CreatedAt string `gorm:"column:created_at"`
+		UpdatedAt string `gorm:"column:updated_at"`
+	}
+
+	var rows []NotificationRow
+	err := d.db.Raw(query).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
 
-	// Parse config JSON for each notification
-	for _, notif := range notifications {
+	// Convert rows to Notification structs
+	notifications := make([]*Notification, 0, len(rows))
+	for _, row := range rows {
+		notif := &Notification{
+			ID:        row.ID,
+			UserID:    row.UserID,
+			Name:      row.Name,
+			Type:      row.Type,
+			ConfigRaw: row.ConfigRaw,
+			IsDefault: row.IsDefault,
+			Active:    row.Active,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+		}
+
+		// Parse config JSON
 		if notif.ConfigRaw != "" {
 			var config map[string]interface{}
 			if err := json.Unmarshal([]byte(notif.ConfigRaw), &config); err != nil {
@@ -160,6 +216,8 @@ func (d *Dispatcher) getDefaultNotifications() ([]*Notification, error) {
 			}
 			notif.Config = config
 		}
+
+		notifications = append(notifications, notif)
 	}
 
 	return notifications, nil

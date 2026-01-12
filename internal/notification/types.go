@@ -24,10 +24,10 @@ type Notification struct {
 	UserID    int                    `json:"user_id" db:"user_id"`
 	Name      string                 `json:"name" db:"name"`
 	Type      string                 `json:"type" db:"type"` // smtp, webhook, discord, etc.
-	Config    map[string]interface{} `json:"config"`
-	ConfigRaw string                 `json:"-" db:"config"` // JSON storage
-	IsDefault bool                   `json:"is_default" db:"is_default"`
-	Active    bool                   `json:"active" db:"active"`
+	Config    map[string]interface{} `json:"config" gorm:"-"`
+	ConfigRaw string                 `json:"-" gorm:"column:config"` // JSON storage
+	IsDefault bool                   `json:"is_default" gorm:"column:is_default"`
+	Active    bool                   `json:"active" gorm:"column:active"`
 	CreatedAt string                 `json:"created_at" db:"created_at"`
 	UpdatedAt string                 `json:"updated_at" db:"updated_at"`
 }
