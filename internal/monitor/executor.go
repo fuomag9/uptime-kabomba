@@ -179,19 +179,28 @@ func (job *monitorJob) runCheck() {
 
 			// Determine if we should send notification based on resend_interval
 			resendInterval := monitor.ResendInterval
-			if resendInterval < 1 {
-				resendInterval = 1 // Ensure minimum of 1
-			}
 
 			shouldNotify := false
-			if job.consecutiveFailures == resendInterval {
-				// First notification after reaching threshold
-				shouldNotify = true
-			} else if job.consecutiveFailures > resendInterval {
-				// Resend notification: check if it's time to resend
-				// After threshold is reached, resend every resend_interval failures
-				if (job.consecutiveFailures-resendInterval)%resendInterval == 0 {
+			if resendInterval == 0 {
+				// resend_interval=0 means notify only once per downtime period (never resend)
+				if job.consecutiveFailures == 1 {
 					shouldNotify = true
+				}
+			} else {
+				// Ensure minimum of 1 for non-zero values
+				if resendInterval < 1 {
+					resendInterval = 1
+				}
+
+				if job.consecutiveFailures == resendInterval {
+					// First notification after reaching threshold
+					shouldNotify = true
+				} else if job.consecutiveFailures > resendInterval {
+					// Resend notification: check if it's time to resend
+					// After threshold is reached, resend every resend_interval failures
+					if (job.consecutiveFailures-resendInterval)%resendInterval == 0 {
+						shouldNotify = true
+					}
 				}
 			}
 

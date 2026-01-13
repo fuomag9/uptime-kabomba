@@ -29,7 +29,7 @@ type Monitor struct {
 	URL            string                 `json:"url"`
 	Interval       int                    `json:"interval" gorm:"default:60"`        // seconds
 	Timeout        int                    `json:"timeout" gorm:"default:30"`         // seconds
-	ResendInterval int                    `json:"resend_interval" gorm:"default:1"`  // send notification after X consecutive failures
+	ResendInterval int                    `json:"resend_interval" gorm:"default:0"`  // 0=once per downtime period, N=resend every N failures
 	IPVersion      string                 `json:"ip_version" gorm:"default:'auto'"`  // auto, ipv4, ipv6
 	Active         bool                   `json:"active" gorm:"default:true;index"`
 	Config         map[string]interface{} `json:"config" gorm:"-"`                      // Type-specific config (not from DB)
