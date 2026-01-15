@@ -11,12 +11,14 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	Port         int
-	Database     DatabaseConfig
-	JWTSecret    string
-	Environment  string
-	CORSOrigins  []string
-	OAuth        *OAuthConfig
+	Port                   int
+	Database               DatabaseConfig
+	JWTSecret              string
+	Environment            string
+	CORSOrigins            []string
+	OAuth                  *OAuthConfig
+	AllowPrivateIPs        bool
+	AllowMetadataEndpoints bool
 }
 
 // DatabaseConfig holds database configuration
@@ -51,10 +53,12 @@ func Load() *Config {
 			MaxOpenConns: getEnvInt("DB_MAX_OPEN_CONNS", 25),
 			MaxIdleConns: getEnvInt("DB_MAX_IDLE_CONNS", 5),
 		},
-		JWTSecret:   jwtSecret,
-		Environment: env,
-		CORSOrigins: loadCORSOrigins(env),
-		OAuth:       oauthConfig,
+		JWTSecret:              jwtSecret,
+		Environment:            env,
+		CORSOrigins:            loadCORSOrigins(env),
+		OAuth:                  oauthConfig,
+		AllowPrivateIPs:        getEnvBool("ALLOW_PRIVATE_IPS", false),
+		AllowMetadataEndpoints: getEnvBool("ALLOW_METADATA_ENDPOINTS", false),
 	}
 
 	// Validate configuration
@@ -188,6 +192,15 @@ func getEnvInt(key string, fallback int) int {
 	if value := os.Getenv(key); value != "" {
 		if intVal, err := strconv.Atoi(value); err == nil {
 			return intVal
+		}
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolVal, err := strconv.ParseBool(value); err == nil {
+			return boolVal
 		}
 	}
 	return fallback

@@ -24,6 +24,12 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
+	// Initialize monitor configuration
+	monitor.SetConfig(&monitor.MonitorConfig{
+		AllowPrivateIPs:        cfg.AllowPrivateIPs,
+		AllowMetadataEndpoints: cfg.AllowMetadataEndpoints,
+	})
+
 	// Initialize database
 	db, err := database.Connect(cfg.Database)
 	if err != nil {

@@ -9,13 +9,15 @@ import (
 
 // SSRFProtection validates URLs to prevent Server-Side Request Forgery attacks
 type SSRFProtection struct {
-	allowPrivateIPs bool
+	allowPrivateIPs        bool
+	allowMetadataEndpoints bool
 }
 
 // NewSSRFProtection creates a new SSRF protection validator
-func NewSSRFProtection(allowPrivateIPs bool) *SSRFProtection {
+func NewSSRFProtection(allowPrivateIPs bool, allowMetadataEndpoints bool) *SSRFProtection {
 	return &SSRFProtection{
-		allowPrivateIPs: allowPrivateIPs,
+		allowPrivateIPs:        allowPrivateIPs,
+		allowMetadataEndpoints: allowMetadataEndpoints,
 	}
 }
 
@@ -83,17 +85,19 @@ func (s *SSRFProtection) isBlockedHostname(hostname string) bool {
 		}
 	}
 
-	// Block cloud metadata endpoints
-	metadataEndpoints := []string{
-		"169.254.169.254", // AWS, Azure, GCP metadata
-		"metadata.google.internal",
-		"169.254.170.2", // AWS ECS metadata
-		"fd00:ec2::254", // AWS IMDSv2 IPv6
-	}
+	// Block cloud metadata endpoints unless explicitly allowed
+	if !s.allowMetadataEndpoints {
+		metadataEndpoints := []string{
+			"169.254.169.254", // AWS, Azure, GCP metadata
+			"metadata.google.internal",
+			"169.254.170.2", // AWS ECS metadata
+			"fd00:ec2::254", // AWS IMDSv2 IPv6
+		}
 
-	for _, blocked := range metadataEndpoints {
-		if hostname == blocked || strings.HasSuffix(hostname, "."+blocked) {
-			return true
+		for _, blocked := range metadataEndpoints {
+			if hostname == blocked || strings.HasSuffix(hostname, "."+blocked) {
+				return true
+			}
 		}
 	}
 

@@ -34,7 +34,8 @@ func (h *HTTPMonitor) Validate(monitor *Monitor) error {
 	}
 
 	// SSRF Protection - validate URL to prevent access to private IPs and metadata endpoints
-	ssrfProtection := NewSSRFProtection(false) // Don't allow private IPs by default
+	cfg := GetConfig()
+	ssrfProtection := NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints)
 	if err := ssrfProtection.ValidateURL(monitor.URL); err != nil {
 		return fmt.Errorf("URL validation failed: %w", err)
 	}

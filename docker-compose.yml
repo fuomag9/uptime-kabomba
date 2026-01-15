@@ -19,6 +19,12 @@ services:
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
       - OAUTH_REDIRECT_URL=${OAUTH_REDIRECT_URL}
       - OAUTH_SCOPES=${OAUTH_SCOPES:-openid,profile,email}
+      # Set to true to allow monitoring private IP addresses (192.168.x.x, 10.x.x.x, etc.)
+      # WARNING: Only enable this if you trust all users, as it bypasses SSRF protection
+      - ALLOW_PRIVATE_IPS=${ALLOW_PRIVATE_IPS:-false}
+      # Set to true to allow monitoring cloud metadata endpoints (169.254.169.254, etc.)
+      # WARNING: This is dangerous in cloud environments. Only enable if absolutely necessary.
+      - ALLOW_METADATA_ENDPOINTS=${ALLOW_METADATA_ENDPOINTS:-false}
     # Grant CAP_NET_RAW capability for ICMP ping (raw sockets)
     # This allows ping to work without running as root
     cap_add:

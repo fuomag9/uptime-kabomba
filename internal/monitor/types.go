@@ -90,6 +90,31 @@ const (
 // MonitorRegistry holds all registered monitor types
 var monitorTypes = make(map[string]MonitorType)
 
+// Global configuration for monitors
+var globalConfig *MonitorConfig
+
+// MonitorConfig holds configuration for monitor validation and behavior
+type MonitorConfig struct {
+	AllowPrivateIPs        bool
+	AllowMetadataEndpoints bool
+}
+
+// SetConfig sets the global monitor configuration
+func SetConfig(cfg *MonitorConfig) {
+	globalConfig = cfg
+}
+
+// GetConfig returns the global monitor configuration
+func GetConfig() *MonitorConfig {
+	if globalConfig == nil {
+		return &MonitorConfig{
+			AllowPrivateIPs:        false, // Default to false for security
+			AllowMetadataEndpoints: false, // Default to false for security
+		}
+	}
+	return globalConfig
+}
+
 // RegisterMonitorType registers a monitor type
 func RegisterMonitorType(mt MonitorType) {
 	monitorTypes[mt.Name()] = mt
