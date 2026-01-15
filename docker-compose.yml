@@ -1,6 +1,7 @@
 services:
   # Backend API
   backend:
+    build: .
     image: ghcr.io/fuomag9/uptime-kabomba-backend:latest
     container_name: uptime-kabomba-backend
     # No ports exposed - only accessible via Docker internal network
@@ -32,6 +33,9 @@ services:
 
   # Frontend Web UI
   frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
     image: ghcr.io/fuomag9/uptime-kabomba-frontend:latest
     container_name: uptime-kabomba-frontend
     ports:
