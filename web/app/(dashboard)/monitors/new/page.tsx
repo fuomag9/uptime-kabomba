@@ -12,10 +12,9 @@ export default function NewMonitorPage() {
   const createMutation = useMutation({
     mutationFn: async (data: { monitor: CreateMonitorRequest, notificationIds: number[] }) => {
       const createdMonitor = await apiClient.createMonitor(data.monitor);
-      // Update notifications if any are selected
-      if (data.notificationIds.length > 0) {
-        await apiClient.updateMonitorNotifications(createdMonitor.id, data.notificationIds);
-      }
+      // Always update notifications to establish explicit configuration
+      // This includes empty arrays to disable notifications completely
+      await apiClient.updateMonitorNotifications(createdMonitor.id, data.notificationIds);
       return createdMonitor;
     },
     onSuccess: () => {

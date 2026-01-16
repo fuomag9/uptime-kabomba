@@ -443,6 +443,11 @@ func HandleUpdateMonitorNotifications(db *gorm.DB) http.HandlerFunc {
 				}
 			}
 
+			// Mark monitor as having explicit notification configuration
+			if err := tx.Exec("UPDATE monitors SET notifications_configured = 1 WHERE id = ?", monitorID).Error; err != nil {
+				return err
+			}
+
 			return nil
 		})
 

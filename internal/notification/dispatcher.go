@@ -56,16 +56,16 @@ func (d *Dispatcher) sendMonitorNotifications(ctx context.Context, monitorID int
 		return fmt.Errorf("failed to get monitor notifications: %w", err)
 	}
 
-	// If no active notifications, check if monitor has been configured at all
+	// If no active notifications, check if monitor has explicit notification config
 	if len(notifications) == 0 {
-		hasConfig, err := d.monitorHasNotificationConfig(monitorID)
+		configured, err := d.monitorHasExplicitNotificationConfig(monitorID)
 		if err != nil {
 			return fmt.Errorf("failed to check monitor notification config: %w", err)
 		}
 
-		// If monitor has never been configured, use defaults
+		// If monitor has never been explicitly configured, use defaults
 		// If it has been configured but all are disabled/inactive, send no notifications
-		if !hasConfig {
+		if !configured {
 			notifications, err = d.getDefaultNotifications()
 			if err != nil {
 				return fmt.Errorf("failed to get default notifications: %w", err)
@@ -115,15 +115,18 @@ func (d *Dispatcher) sendNotification(ctx context.Context, notif *Notification, 
 	return provider.Send(ctx, notif, msg)
 }
 
-// monitorHasNotificationConfig checks if a monitor has any notification configuration
-// Returns true if there are any entries in monitor_notifications table for this monitor
-func (d *Dispatcher) monitorHasNotificationConfig(monitorID int) (bool, error) {
-	var count int64
-	err := d.db.Table("monitor_notifications").Where("monitor_id = ?", monitorID).Count(&count).Error
+// monitorHasExplicitNotificationConfig checks if notifications have been explicitly configured
+// Returns true if the notifications_configured field is set to true
+func (d *Dispatcher) monitorHasExplicitNotificationConfig(monitorID int) (bool, error) {
+	var configured bool
+	err := d.db.Table("monitors").
+		Select("notifications_configured").
+		Where("id = ?", monitorID).
+		Scan(&configured).Error
 	if err != nil {
 		return false, err
 	}
-	return count > 0, nil
+	return configured, nil
 }
 
 // getMonitorNotifications gets all notifications linked to a monitor

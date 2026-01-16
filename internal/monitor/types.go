@@ -22,20 +22,21 @@ type MonitorType interface {
 
 // Monitor represents a monitor configuration
 type Monitor struct {
-	ID             int                    `json:"id" gorm:"primaryKey;autoIncrement"`
-	UserID         int                    `json:"user_id" gorm:"not null;index"`
-	Name           string                 `json:"name" gorm:"not null"`
-	Type           string                 `json:"type" gorm:"not null;index"`
-	URL            string                 `json:"url"`
-	Interval       int                    `json:"interval" gorm:"default:60"`        // seconds
-	Timeout        int                    `json:"timeout" gorm:"default:30"`         // seconds
-	ResendInterval int                    `json:"resend_interval" gorm:"default:0"`  // 0=once per downtime period, N=resend every N failures
-	IPVersion      string                 `json:"ip_version" gorm:"default:'auto'"`  // auto, ipv4, ipv6
-	Active         bool                   `json:"active" gorm:"default:true;index"`
-	Config         map[string]interface{} `json:"config" gorm:"-"`                      // Type-specific config (not from DB)
-	ConfigRaw      string                 `json:"-" gorm:"column:config;type:text"`     // JSON storage
-	CreatedAt      time.Time              `json:"created_at"`
-	UpdatedAt      time.Time              `json:"updated_at"`
+	ID                      int                    `json:"id" gorm:"primaryKey;autoIncrement"`
+	UserID                  int                    `json:"user_id" gorm:"not null;index"`
+	Name                    string                 `json:"name" gorm:"not null"`
+	Type                    string                 `json:"type" gorm:"not null;index"`
+	URL                     string                 `json:"url"`
+	Interval                int                    `json:"interval" gorm:"default:60"`        // seconds
+	Timeout                 int                    `json:"timeout" gorm:"default:30"`         // seconds
+	ResendInterval          int                    `json:"resend_interval" gorm:"default:0"`  // 0=once per downtime period, N=resend every N failures
+	IPVersion               string                 `json:"ip_version" gorm:"default:'auto'"`  // auto, ipv4, ipv6
+	Active                  bool                   `json:"active" gorm:"default:true;index"`
+	NotificationsConfigured bool                   `json:"-" gorm:"default:false"`            // true if notifications have been explicitly set
+	Config                  map[string]interface{} `json:"config" gorm:"-"`                   // Type-specific config (not from DB)
+	ConfigRaw               string                 `json:"-" gorm:"column:config;type:text"`  // JSON storage
+	CreatedAt               time.Time              `json:"created_at"`
+	UpdatedAt               time.Time              `json:"updated_at"`
 }
 
 // TableName specifies the table name for Monitor
