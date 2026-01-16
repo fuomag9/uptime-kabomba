@@ -56,11 +56,20 @@ func (d *Dispatcher) sendMonitorNotifications(ctx context.Context, monitorID int
 		return fmt.Errorf("failed to get monitor notifications: %w", err)
 	}
 
-	// If no specific notifications, get default notifications
+	// If no active notifications, check if monitor has been configured at all
 	if len(notifications) == 0 {
-		notifications, err = d.getDefaultNotifications()
+		hasConfig, err := d.monitorHasNotificationConfig(monitorID)
 		if err != nil {
-			return fmt.Errorf("failed to get default notifications: %w", err)
+			return fmt.Errorf("failed to check monitor notification config: %w", err)
+		}
+
+		// If monitor has never been configured, use defaults
+		// If it has been configured but all are disabled/inactive, send no notifications
+		if !hasConfig {
+			notifications, err = d.getDefaultNotifications()
+			if err != nil {
+				return fmt.Errorf("failed to get default notifications: %w", err)
+			}
 		}
 	}
 
@@ -104,6 +113,17 @@ func (d *Dispatcher) sendNotification(ctx context.Context, notif *Notification, 
 	}
 
 	return provider.Send(ctx, notif, msg)
+}
+
+// monitorHasNotificationConfig checks if a monitor has any notification configuration
+// Returns true if there are any entries in monitor_notifications table for this monitor
+func (d *Dispatcher) monitorHasNotificationConfig(monitorID int) (bool, error) {
+	var count int64
+	err := d.db.Table("monitor_notifications").Where("monitor_id = ?", monitorID).Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // getMonitorNotifications gets all notifications linked to a monitor

@@ -88,8 +88,13 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
         setNotifications(notifs);
 
         if (monitorId) {
+          // Editing existing monitor - load its linked notifications
           const linked = await apiClient.getMonitorNotifications(monitorId);
           setSelectedNotificationIds(linked.map(n => n.id));
+        } else {
+          // Creating new monitor - auto-select default notifications
+          const defaultIds = notifs.filter(n => n.is_default).map(n => n.id);
+          setSelectedNotificationIds(defaultIds);
         }
       } catch (error) {
         console.error('Failed to load notifications:', error);
@@ -310,7 +315,7 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
           Notifications
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Select which notifications to use for this monitor. If none selected, default notifications will be used.
+          Select which notifications to use for this monitor. Default notifications are pre-selected. Unselect all to disable notifications completely.
         </p>
 
         {loadingNotifications ? (
