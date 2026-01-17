@@ -26,11 +26,10 @@ function MonitorSidebarItem({ monitor }: { monitor: any }) {
   return (
     <Link
       href={`/monitors/${monitor.id}`}
-      className={`block px-3 py-2 rounded-md text-sm transition-colors ${
-        isActive
-          ? 'bg-primary text-white'
-          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-      }`}
+      className={`block px-3 py-2 rounded-md text-sm transition-colors ${isActive
+        ? 'bg-primary text-white'
+        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+        }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center min-w-0 flex-1">
@@ -61,6 +60,10 @@ export function MonitorSidebar() {
     refetchInterval: 30000,
   });
 
+  const sortedMonitors = [...monitors].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+
   return (
     <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto">
       <div className="p-4">
@@ -81,9 +84,9 @@ export function MonitorSidebar() {
           <div className="text-center py-4">
             <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-primary border-r-transparent"></div>
           </div>
-        ) : monitors.length > 0 ? (
+        ) : sortedMonitors.length > 0 ? (
           <div className="space-y-1">
-            {monitors.map((monitor) => (
+            {sortedMonitors.map((monitor) => (
               <MonitorSidebarItem key={monitor.id} monitor={monitor} />
             ))}
           </div>
