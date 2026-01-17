@@ -68,7 +68,7 @@ export default function DashboardLayout({
           <div className="flex h-16 justify-between items-center">
             <div className="flex items-center">
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                Uptime Kabomba
+                Uptime Kabomba 💣
               </h1>
               <div className="ml-4 flex items-center space-x-2">
                 <div className={`h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />

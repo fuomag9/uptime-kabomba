@@ -228,7 +228,7 @@ export default function NewStatusPagePage() {
               onChange={(e) => setShowPoweredBy(e.target.checked)}
               className="mr-2"
             />
-            <span className="text-sm text-gray-700">Show "Powered by Uptime Kabomba" footer</span>
+            <span className="text-sm text-gray-700">Show "Powered by Uptime Kabomba 💣" footer</span>
           </label>
         </div>
 

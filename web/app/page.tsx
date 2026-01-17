@@ -64,7 +64,7 @@ export default function Home() {
     <div className="flex min-h-screen flex-col items-center justify-center p-24">
       <div className="max-w-2xl text-center">
         <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl">
-          Uptime Kabomba
+          Uptime Kabomba 💣
         </h1>
         <div className="mt-10 flex items-center justify-center gap-x-6">
           {!setupComplete ? (

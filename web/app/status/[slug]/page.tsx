@@ -241,7 +241,7 @@ export default function PublicStatusPageComponent() {
         {/* Footer */}
         {data.page.show_powered_by && (
           <div className={`mt-12 text-center text-sm ${mutedTextClass}`}>
-            Powered by <a href="https://github.com/fuomag9/uptime-kabomba" className="underline hover:no-underline">Uptime Kabomba</a>
+            Powered by <a href="https://github.com/fuomag9/uptime-kabomba" className="underline hover:no-underline">Uptime Kabomba 💣</a>
           </div>
         )}
 
