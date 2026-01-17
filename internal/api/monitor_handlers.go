@@ -429,7 +429,7 @@ func HandleGetMonitorNotifications(db *gorm.DB) http.HandlerFunc {
 // UpdateMonitorNotificationsRequest represents the request body for updating monitor notifications
 type UpdateMonitorNotificationsRequest struct {
 	NotificationIDs []int `json:"notification_ids"`
-	UseDefaults     *bool `json:"use_defaults,omitempty"` // If true, use default notifications (notifications_configured = 0)
+	UseDefaults     *bool `json:"use_defaults,omitempty"` // If true, use default notifications (notifications_configured = false)
 }
 
 // HandleUpdateMonitorNotifications replaces all notification associations for a monitor
@@ -491,9 +491,9 @@ func HandleUpdateMonitorNotifications(db *gorm.DB) http.HandlerFunc {
 
 			// Check if we should use default notifications
 			if req.UseDefaults != nil && *req.UseDefaults {
-				// Use default notifications - set notifications_configured = 0
+				// Use default notifications - set notifications_configured = false
 				// This means the dispatcher will use all notifications marked as is_default
-				if err := tx.Exec("UPDATE monitors SET notifications_configured = 0 WHERE id = ?", monitorID).Error; err != nil {
+				if err := tx.Exec("UPDATE monitors SET notifications_configured = false WHERE id = ?", monitorID).Error; err != nil {
 					return err
 				}
 			} else {
@@ -505,7 +505,7 @@ func HandleUpdateMonitorNotifications(db *gorm.DB) http.HandlerFunc {
 				}
 
 				// Mark monitor as having explicit notification configuration
-				if err := tx.Exec("UPDATE monitors SET notifications_configured = 1 WHERE id = ?", monitorID).Error; err != nil {
+				if err := tx.Exec("UPDATE monitors SET notifications_configured = true WHERE id = ?", monitorID).Error; err != nil {
 					return err
 				}
 			}

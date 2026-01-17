@@ -30,9 +30,6 @@ COPY --from=backend-builder /app/uptime-kabomba-server .
 # Copy migrations from builder
 COPY --from=backend-builder /app/migrations ./migrations
 
-# Create data directory for SQLite
-RUN mkdir -p /data
-
 # Expose port
 EXPOSE 8080
 
@@ -41,8 +38,8 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Set environment variables
-ENV DATABASE_TYPE=sqlite \
-    DATABASE_DSN=/data/uptime.db \
+ENV DATABASE_TYPE=postgres \
+    DATABASE_DSN=host=postgres user=uptime password=secret dbname=uptime sslmode=disable \
     PORT=8080
 
 # Run the application

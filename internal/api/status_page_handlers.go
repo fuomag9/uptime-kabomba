@@ -292,9 +292,14 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 		// Password protection not implemented yet (no password column in schema)
 
 		// Get monitors with their latest heartbeat
+		type StatusHistoryBucket struct {
+			Start  time.Time `json:"start"`
+			Status int       `json:"status"`
+		}
 		type MonitorWithStatus struct {
 			models.Monitor
 			LastHeartbeat *models.Heartbeat `json:"last_heartbeat"`
+			History       []StatusHistoryBucket `json:"history"`
 		}
 
 		var monitors []models.Monitor
@@ -304,16 +309,186 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 			Find(&monitors)
 
 		monitorsWithStatus := make([]MonitorWithStatus, len(monitors))
+		monitorIDs := make([]int, 0, len(monitors))
 		for i, monitor := range monitors {
 			monitorsWithStatus[i].Monitor = monitor
+			monitorIDs = append(monitorIDs, monitor.ID)
+		}
 
-			// Get latest heartbeat
-			var heartbeat models.Heartbeat
-			if err := db.Where("monitor_id = ?", monitor.ID).
-				Order("time DESC").
-				Limit(1).
-				First(&heartbeat).Error; err == nil {
-				monitorsWithStatus[i].LastHeartbeat = &heartbeat
+		// Get latest heartbeat per monitor in one query
+		lastHeartbeatStatusByMonitor := make(map[int]int, len(monitorIDs))
+		if len(monitorIDs) > 0 {
+			var latest []models.Heartbeat
+			db.Raw(`
+				SELECT DISTINCT ON (monitor_id) *
+				FROM heartbeats
+				WHERE monitor_id IN ?
+				ORDER BY monitor_id, time DESC
+			`, monitorIDs).Scan(&latest)
+
+			latestByMonitor := make(map[int]models.Heartbeat, len(latest))
+			for _, hb := range latest {
+				latestByMonitor[hb.MonitorID] = hb
+				lastHeartbeatStatusByMonitor[hb.MonitorID] = hb.Status
+			}
+
+			for i, monitor := range monitors {
+				if hb, ok := latestByMonitor[monitor.ID]; ok {
+					monitorsWithStatus[i].LastHeartbeat = &hb
+				}
+			}
+		}
+
+		// Build last-1h status history per monitor (bucket size = max(60s, monitor interval))
+		now := time.Now().UTC()
+		start := now.Add(-1 * time.Hour)
+		historyByMonitor := make(map[int][]StatusHistoryBucket, len(monitors))
+		intervalByMonitor := make(map[int]time.Duration, len(monitors))
+
+		monitorIntervalByID := make(map[int]int, len(monitors))
+		for _, monitor := range monitors {
+			monitorIntervalByID[monitor.ID] = monitor.Interval
+		}
+
+		for _, monitorID := range monitorIDs {
+			intervalSeconds := 60
+			if interval, ok := monitorIntervalByID[monitorID]; ok && interval > 0 {
+				if interval > intervalSeconds {
+					intervalSeconds = interval
+				}
+			}
+
+			interval := time.Duration(intervalSeconds) * time.Second
+			intervalByMonitor[monitorID] = interval
+
+			bucketCount := int((1*time.Hour + interval - 1) / interval)
+			buckets := make([]StatusHistoryBucket, bucketCount)
+			for i := 0; i < bucketCount; i++ {
+				buckets[i] = StatusHistoryBucket{
+					Start:  start.Add(time.Duration(i) * interval),
+					Status: -1,
+				}
+			}
+			historyByMonitor[monitorID] = buckets
+		}
+
+		if len(monitorIDs) > 0 {
+			type bucketRow struct {
+				MonitorID int   `gorm:"column:monitor_id"`
+				Bucket    int64 `gorm:"column:bucket"`
+				MaxWeight int   `gorm:"column:max_weight"`
+			}
+
+			var rows []bucketRow
+			db.Raw(`
+				SELECT
+					h.monitor_id,
+					FLOOR(EXTRACT(EPOCH FROM h.time) / GREATEST(60, m.interval)) AS bucket,
+					MAX(
+						CASE h.status
+							WHEN 0 THEN 4
+							WHEN 3 THEN 3
+							WHEN 2 THEN 2
+							WHEN 1 THEN 1
+							ELSE 0
+						END
+					) AS max_weight
+				FROM heartbeats h
+				JOIN monitors m ON m.id = h.monitor_id
+				WHERE h.monitor_id IN ? AND h.time >= ?
+				GROUP BY h.monitor_id, bucket, GREATEST(60, m.interval)
+				ORDER BY h.monitor_id, bucket ASC
+			`, monitorIDs, start).Scan(&rows)
+
+			type lastStatusRow struct {
+				MonitorID int `gorm:"column:monitor_id"`
+				Status    int `gorm:"column:status"`
+			}
+			var lastStatusRows []lastStatusRow
+			db.Raw(`
+				SELECT DISTINCT ON (monitor_id) monitor_id, status
+				FROM heartbeats
+				WHERE monitor_id IN ? AND time < ?
+				ORDER BY monitor_id, time DESC
+			`, monitorIDs, start).Scan(&lastStatusRows)
+
+			lastStatusByMonitor := make(map[int]int, len(lastStatusRows))
+			for _, row := range lastStatusRows {
+				lastStatusByMonitor[row.MonitorID] = row.Status
+			}
+
+			bucketStatusByMonitor := make(map[int]map[int]int, len(monitorIDs))
+			for _, row := range rows {
+				buckets, ok := historyByMonitor[row.MonitorID]
+				if !ok || len(buckets) == 0 {
+					continue
+				}
+
+				interval := intervalByMonitor[row.MonitorID]
+				if interval <= 0 {
+					interval = time.Minute
+				}
+				intervalSeconds := int64(interval.Seconds())
+				if intervalSeconds <= 0 {
+					continue
+				}
+
+				bucketStartIndex := start.Unix() / intervalSeconds
+				idx := int(row.Bucket - bucketStartIndex)
+				if idx < 0 || idx >= len(buckets) {
+					continue
+				}
+
+				status := -1
+				switch row.MaxWeight {
+				case 4:
+					status = 0
+				case 3:
+					status = 3
+				case 2:
+					status = 2
+				case 1:
+					status = 1
+				}
+				if _, ok := bucketStatusByMonitor[row.MonitorID]; !ok {
+					bucketStatusByMonitor[row.MonitorID] = make(map[int]int)
+				}
+				bucketStatusByMonitor[row.MonitorID][idx] = status
+			}
+
+			for _, monitorID := range monitorIDs {
+				buckets, ok := historyByMonitor[monitorID]
+				if !ok || len(buckets) == 0 {
+					continue
+				}
+
+				lastStatus, hasLast := lastStatusByMonitor[monitorID]
+				if !hasLast {
+					if hbStatus, ok := lastHeartbeatStatusByMonitor[monitorID]; ok {
+						lastStatus = hbStatus
+						hasLast = true
+					}
+				}
+				for i := range buckets {
+					if statusMap, ok := bucketStatusByMonitor[monitorID]; ok {
+						if status, ok := statusMap[i]; ok {
+							buckets[i].Status = status
+							lastStatus = status
+							hasLast = true
+							continue
+						}
+					}
+
+					if hasLast {
+						buckets[i].Status = lastStatus
+					}
+				}
+			}
+		}
+
+		for i, monitor := range monitors {
+			if history, ok := historyByMonitor[monitor.ID]; ok {
+				monitorsWithStatus[i].History = history
 			}
 		}
 
@@ -332,6 +507,71 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
+	}
+}
+
+// HandleGetPublicStatusPageHeartbeats returns monitor heartbeats for a public status page
+func HandleGetPublicStatusPageHeartbeats(db *gorm.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slug := chi.URLParam(r, "slug")
+		monitorID := chi.URLParam(r, "id")
+
+		// Ensure status page exists and is published
+		var page models.StatusPage
+		if err := db.Where("slug = ? AND published = ?", slug, true).
+			First(&page).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				http.Error(w, "Status page not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "Failed to fetch status page", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Ensure monitor belongs to page
+		var count int64
+		db.Table("status_page_monitors").
+			Where("status_page_id = ? AND monitor_id = ?", page.ID, monitorID).
+			Count(&count)
+		if count == 0 {
+			http.Error(w, "Monitor not found", http.StatusNotFound)
+			return
+		}
+
+		// Get query params
+		limitStr := r.URL.Query().Get("limit")
+		period := r.URL.Query().Get("period")
+
+		limit := 200
+		if limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 2000 {
+				limit = l
+			}
+		}
+
+		query := db.Where("monitor_id = ?", monitorID)
+		if period == "" {
+			period = "1h"
+		}
+
+		endTime := time.Now()
+		switch period {
+		case "1h":
+			query = query.Where("time >= ? AND time <= ?", endTime.Add(-1*time.Hour), endTime)
+		default:
+			query = query.Where("time >= ? AND time <= ?", endTime.Add(-1*time.Hour), endTime)
+		}
+
+		var heartbeats []models.Heartbeat
+		if err := query.Order("time DESC").
+			Limit(limit).
+			Find(&heartbeats).Error; err != nil {
+			http.Error(w, "Failed to fetch heartbeats", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(heartbeats)
 	}
 }
 

@@ -112,7 +112,6 @@ uptime-kabomba/
 │   ├── components/        # React components
 │   ├── hooks/             # Custom React hooks
 │   └── lib/               # Utilities & API client
-├── data/                   # SQLite database (gitignored)
 ├── go.mod                  # Go dependencies
 ├── Makefile               # Build commands
 └── docker-compose.yml     # Docker setup
@@ -129,13 +128,9 @@ Create a `.env` file in the root directory:
 PORT=8080
 ENVIRONMENT=development
 
-# Database (SQLite - default)
-DB_TYPE=sqlite
-DB_DSN=./data/kuma.db
-
-# Database (PostgreSQL - alternative)
-# DB_TYPE=postgres
-# DB_DSN=postgresql://kuma:kuma@localhost:5432/kuma?sslmode=disable
+# Database (PostgreSQL)
+DB_TYPE=postgres
+DB_DSN=postgresql://kuma:kuma@localhost:5432/kuma?sslmode=disable
 
 # Database Connection Pool
 DB_MAX_OPEN_CONNS=25
@@ -154,22 +149,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8080
 NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
 ```
 
-## Database Options
-
-### SQLite (Default)
-
-No setup required! The database file is created automatically in `./data/kuma.db`.
-
-**Pros:**
-- Zero configuration
-- Perfect for small deployments
-- Easy backups (single file)
-
-**Cons:**
-- Not ideal for high-concurrency
-- Limited to single server
-
-### PostgreSQL (Recommended for Production)
+## Database Setup
 
 1. **Install PostgreSQL**
    ```bash
@@ -190,7 +170,7 @@ No setup required! The database file is created automatically in `./data/kuma.db
 2. **Update environment variables**
    ```bash
    DB_TYPE=postgres
-   DB_DSN=postgresql://kuma:kuma@localhost:5432/kuma?sslmode=disable
+DB_DSN=postgresql://kuma:kuma@localhost:5432/kuma?sslmode=disable
    ```
 
 3. **Restart backend**
@@ -351,7 +331,7 @@ npm install
 - ✅ Go backend with Chi router
 - ✅ JWT authentication (login, logout, setup)
 - ✅ WebSocket real-time communication
-- ✅ Database support (SQLite + PostgreSQL)
+- ✅ Database support (PostgreSQL)
 - ✅ Automated migrations
 - ✅ Background job scheduler
 - ✅ Next.js 15 frontend

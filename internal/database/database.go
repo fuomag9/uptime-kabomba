@@ -2,12 +2,9 @@ package database
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -18,20 +15,11 @@ import (
 func Connect(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	var dialector gorm.Dialector
 
-	switch cfg.Type {
-	case "sqlite":
-		// Ensure directory exists for SQLite
-		dir := filepath.Dir(cfg.DSN)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, fmt.Errorf("failed to create database directory: %w", err)
-		}
-
-		dialector = sqlite.Open(cfg.DSN + "?_foreign_keys=on&_journal_mode=WAL")
-	case "postgres":
-		dialector = postgres.Open(cfg.DSN)
-	default:
+	if cfg.Type != "postgres" {
 		return nil, fmt.Errorf("unsupported database type: %s", cfg.Type)
 	}
+
+	dialector = postgres.Open(cfg.DSN)
 
 	db, err := gorm.Open(dialector, &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),

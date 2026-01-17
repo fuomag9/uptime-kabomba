@@ -51,12 +51,6 @@ func (s *Scheduler) Start() {
 		s.cleanupOldStats()
 	})
 
-	// Vacuum database weekly at 2:30 AM on Sunday
-	s.cron.AddFunc("30 2 * * 0", func() {
-		log.Println("Running vacuum job...")
-		s.vacuumDatabase()
-	})
-
 	s.cron.Start()
 	log.Println("Job scheduler started")
 }
@@ -109,7 +103,7 @@ func (s *Scheduler) cleanupOldHeartbeats() {
 			DELETE FROM heartbeats
 			WHERE important = false
 			AND monitor_id IN (?)
-			AND time < datetime('now', '-%d days')
+			AND time < NOW() - INTERVAL '%d days'
 		`, retentionDays)
 
 		result := s.db.Exec(query, monitorIDs)
@@ -175,7 +169,7 @@ func (s *Scheduler) cleanupOldStats() {
 		hourlyQuery := fmt.Sprintf(`
 			DELETE FROM stat_hourly
 			WHERE monitor_id IN (?)
-			AND hour < datetime('now', '-%d days')
+			AND hour < NOW() - INTERVAL '%d days'
 		`, hourlyRetention)
 
 		result := s.db.Exec(hourlyQuery, monitorIDs)
@@ -190,7 +184,7 @@ func (s *Scheduler) cleanupOldStats() {
 		dailyQuery := fmt.Sprintf(`
 			DELETE FROM stat_daily
 			WHERE monitor_id IN (?)
-			AND date < date('now', '-%d days')
+			AND "date" < CURRENT_DATE - INTERVAL '%d days'
 		`, dailyRetention)
 
 		result = s.db.Exec(dailyQuery, monitorIDs)
@@ -203,15 +197,4 @@ func (s *Scheduler) cleanupOldStats() {
 	}
 
 	log.Printf("Total stats cleaned up: %d hourly, %d daily", totalHourlyCleaned, totalDailyCleaned)
-}
-
-// vacuumDatabase runs VACUUM on SQLite database
-func (s *Scheduler) vacuumDatabase() {
-	result := s.db.Exec("VACUUM")
-	if result.Error != nil {
-		log.Printf("Failed to vacuum database: %v", result.Error)
-		return
-	}
-
-	log.Println("Database vacuum completed")
 }

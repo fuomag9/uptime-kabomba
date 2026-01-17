@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { apiClient, PublicStatusPage } from '@/lib/api';
+import { apiClient, MonitorWithStatus, PublicStatusPage, Heartbeat } from '@/lib/api';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import HeartbeatChart from '@/components/monitors/HeartbeatChart';
 
 export default function PublicStatusPageComponent() {
   const params = useParams();
@@ -14,6 +15,9 @@ export default function PublicStatusPageComponent() {
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [selectedMonitor, setSelectedMonitor] = useState<MonitorWithStatus | null>(null);
+  const [chartHeartbeats, setChartHeartbeats] = useState<Record<number, Heartbeat[]>>({});
+  const [loadingChart, setLoadingChart] = useState(false);
 
   useEffect(() => {
     loadStatusPage();
@@ -83,12 +87,20 @@ export default function PublicStatusPageComponent() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Loading status page...</div>
-      </div>
-    );
+  function getHistoryColor(status: number) {
+    switch (status) {
+      case 1: return 'bg-green-500';
+      case 0: return 'bg-red-500';
+      case 3: return 'bg-yellow-500';
+      case 2: return 'bg-yellow-400';
+      default: return isDark ? 'bg-gray-700' : 'bg-gray-200';
+    }
+  }
+
+  function formatHistoryLabel(start: string, intervalSeconds: number) {
+    const startDate = new Date(start);
+    const endDate = new Date(startDate.getTime() + intervalSeconds * 1000);
+    return `${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   }
 
   if (showPasswordPrompt) {
@@ -125,7 +137,7 @@ export default function PublicStatusPageComponent() {
     );
   }
 
-  if (error || !data) {
+  if (error && !loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -135,18 +147,21 @@ export default function PublicStatusPageComponent() {
     );
   }
 
-  const isDark = data.page.theme === 'dark';
+  const isDark = data?.page.theme === 'dark';
   const bgClass = isDark ? 'bg-gray-900' : 'bg-gray-50';
   const textClass = isDark ? 'text-white' : 'text-gray-900';
   const mutedTextClass = isDark ? 'text-gray-400' : 'text-gray-600';
   const cardBgClass = isDark ? 'bg-gray-800' : 'bg-white';
   const borderClass = isDark ? 'border-gray-700' : 'border-gray-200';
 
-  const overallStatus = getOverallStatus();
+  const overallStatus = data ? getOverallStatus() : { text: 'Loading status', color: mutedTextClass };
+  const showSkeleton = loading && !data;
 
   return (
     <div className={`min-h-screen ${bgClass} ${textClass}`}>
-      <style dangerouslySetInnerHTML={{ __html: data.page.custom_css || '' }} />
+      {data?.page.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: data.page.custom_css || '' }} />
+      )}
 
       <div className="absolute top-4 right-4 z-10">
         <ThemeToggle />
@@ -155,17 +170,27 @@ export default function PublicStatusPageComponent() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-2">{data.page.title}</h1>
-          {data.page.description && (
-            <p className={`text-lg ${mutedTextClass}`}>{data.page.description}</p>
+          {showSkeleton ? (
+            <div className="flex flex-col items-center gap-3 animate-pulse">
+              <div className={`h-10 w-64 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+              <div className={`h-4 w-80 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+              <div className={`h-6 w-48 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+            </div>
+          ) : (
+            <>
+              <h1 className="text-4xl font-bold mb-2">{data?.page.title}</h1>
+              {data?.page.description && (
+                <p className={`text-lg ${mutedTextClass}`}>{data.page.description}</p>
+              )}
+              <div className={`mt-4 text-2xl font-semibold ${overallStatus.color}`}>
+                {overallStatus.text}
+              </div>
+            </>
           )}
-          <div className={`mt-4 text-2xl font-semibold ${overallStatus.color}`}>
-            {overallStatus.text}
-          </div>
         </div>
 
         {/* Incidents */}
-        {data.incidents && data.incidents.length > 0 && (
+        {data?.incidents && data.incidents.length > 0 && (
           <div className="mb-8 space-y-4">
             <h2 className="text-xl font-semibold mb-4">Incidents</h2>
             {data.incidents.map((incident) => (
@@ -195,12 +220,36 @@ export default function PublicStatusPageComponent() {
         {/* Monitors */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold mb-4">Services</h2>
-          {data.monitors.length === 0 ? (
+          {showSkeleton ? (
+            <div className="grid gap-4">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={`skeleton-${index}`}
+                  className={`${cardBgClass} border ${borderClass} rounded-lg p-4 animate-pulse`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className={`w-3 h-3 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <div>
+                        <div className={`h-4 w-40 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                        <div className={`mt-2 h-3 w-24 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`h-4 w-24 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <div className={`mt-2 h-3 w-12 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                    </div>
+                  </div>
+                  <div className={`mt-4 h-10 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                </div>
+              ))}
+            </div>
+          ) : data?.monitors.length === 0 ? (
             <div className={`${cardBgClass} border ${borderClass} rounded-lg p-8 text-center`}>
               <p className={mutedTextClass}>No monitors configured</p>
             </div>
           ) : (
-            data.monitors.map((monitor) => {
+            data?.monitors.map((monitor) => {
               const status = monitor.last_heartbeat?.status ?? 2;
               const statusColor = getStatusColor(status);
               const statusText = getStatusText(status);
@@ -232,6 +281,60 @@ export default function PublicStatusPageComponent() {
                       {monitor.last_heartbeat.message}
                     </div>
                   )}
+                  {monitor.history && monitor.history.length > 0 && (
+                    <div className="mt-4">
+                      <div className={`text-xs ${mutedTextClass} mb-2`}>Last hour</div>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setSelectedMonitor(monitor);
+                          if (!chartHeartbeats[monitor.id]) {
+                            setLoadingChart(true);
+                            apiClient.getPublicStatusPageHeartbeats(slug, monitor.id, { period: '1h' })
+                              .then((heartbeats) => {
+                                setChartHeartbeats((prev) => ({ ...prev, [monitor.id]: heartbeats }));
+                              })
+                              .catch((err: any) => {
+                                console.error('Failed to load public heartbeats:', err);
+                              })
+                              .finally(() => setLoadingChart(false));
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedMonitor(monitor);
+                            if (!chartHeartbeats[monitor.id]) {
+                              setLoadingChart(true);
+                              apiClient.getPublicStatusPageHeartbeats(slug, monitor.id, { period: '1h' })
+                                .then((heartbeats) => {
+                                  setChartHeartbeats((prev) => ({ ...prev, [monitor.id]: heartbeats }));
+                                })
+                                .catch((err: any) => {
+                                  console.error('Failed to load public heartbeats:', err);
+                                })
+                                .finally(() => setLoadingChart(false));
+                            }
+                          }
+                        }}
+                        className={`cursor-pointer rounded-md ${isDark ? 'bg-gray-900/40' : 'bg-gray-100'} p-2`}
+                      >
+                        <div className="flex gap-[2px] items-end w-full">
+                          {monitor.history.map((bucket, index) => {
+                            const intervalSeconds = monitor.interval > 0 ? Math.max(60, monitor.interval) : 60;
+                            return (
+                              <div
+                                key={`${monitor.id}-${index}`}
+                                className={`min-w-[3px] flex-1 h-12 rounded-sm ${getHistoryColor(bucket.status)}`}
+                                title={formatHistoryLabel(bucket.start, intervalSeconds)}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -239,16 +342,56 @@ export default function PublicStatusPageComponent() {
         </div>
 
         {/* Footer */}
-        {data.page.show_powered_by && (
+        {data?.page.show_powered_by && (
           <div className={`mt-12 text-center text-sm ${mutedTextClass}`}>
             Powered by <a href="https://github.com/fuomag9/uptime-kabomba" className="underline hover:no-underline">Uptime Kabomba 💣</a>
           </div>
         )}
 
-        <div className={`mt-4 text-center text-xs ${mutedTextClass}`}>
-          Last updated: {new Date().toLocaleString()}
-        </div>
+        {data && (
+          <div className={`mt-4 text-center text-xs ${mutedTextClass}`}>
+            Last updated: {new Date().toLocaleString()}
+          </div>
+        )}
       </div>
+
+      {selectedMonitor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setSelectedMonitor(null)}
+        >
+          <div
+            className={`${cardBgClass} ${borderClass} border rounded-xl shadow-2xl w-full max-w-3xl mx-4 p-6`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className={`text-lg font-semibold ${textClass}`}>{selectedMonitor.name}</h3>
+                <p className={`text-sm ${mutedTextClass}`}>Status timeline (last hour)</p>
+              </div>
+              <button
+                onClick={() => setSelectedMonitor(null)}
+                className={`text-sm px-3 py-1 rounded-md border ${borderClass} ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6">
+              {loadingChart ? (
+                <div className={`flex items-center justify-center h-[240px] ${isDark ? 'bg-gray-900/40' : 'bg-gray-100'} rounded-lg`}>
+                  <span className={mutedTextClass}>Loading chart...</span>
+                </div>
+              ) : (
+                <HeartbeatChart
+                  heartbeats={(chartHeartbeats[selectedMonitor.id] || []) as any}
+                  height={240}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 
 -- Create new table with updated structure
 CREATE TABLE IF NOT EXISTS api_keys_new (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     key_hash TEXT NOT NULL UNIQUE,
@@ -19,6 +19,13 @@ CREATE TABLE IF NOT EXISTS api_keys_new (
 INSERT INTO api_keys_new (id, user_id, name, key_hash, prefix, expires_at, created_at)
 SELECT id, user_id, name, key as key_hash, '', expires_at, created_at
 FROM api_keys;
+
+-- Ensure the sequence is set to the current max id
+SELECT setval(
+    pg_get_serial_sequence('api_keys_new', 'id'),
+    GREATEST(1, COALESCE(MAX(id), 0))
+)
+FROM api_keys_new;
 
 -- Drop old table
 DROP TABLE api_keys;

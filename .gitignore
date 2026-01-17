@@ -5,9 +5,6 @@ dist-ssr
 *.local
 .idea
 
-/data
-!/data/.gitkeep
-/data*
 .vscode
 
 /private
@@ -34,9 +31,6 @@ extra/exe-builder/obj
 *.out
 /uptime-kabomba-server
 /cmd/server/server
-*.db
-*.db-shm
-*.db-wal
 
 # Next.js frontend
 /web/.next/

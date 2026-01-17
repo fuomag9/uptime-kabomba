@@ -1,15 +1,25 @@
 services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: uptime-kabomba-postgres
+    environment:
+      - POSTGRES_DB=uptime
+      - POSTGRES_USER=uptime
+      - POSTGRES_PASSWORD=secret
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   # Backend API
   backend:
     build: .
     image: ghcr.io/fuomag9/uptime-kabomba-backend:latest
     container_name: uptime-kabomba-backend
     # No ports exposed - only accessible via Docker internal network
-    volumes:
-      - uptime-data:/data
     environment:
-      - DATABASE_TYPE=sqlite
-      - DATABASE_DSN=/data/uptime.db
+      - DATABASE_TYPE=postgres
+      - DATABASE_DSN=host=postgres user=uptime password=secret dbname=uptime sslmode=disable
       - PORT=8080
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - JWT_SECRET=${JWT_SECRET}
@@ -30,6 +40,8 @@ services:
     cap_add:
       - NET_RAW
     restart: unless-stopped
+    depends_on:
+      - postgres
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
@@ -55,5 +67,5 @@ services:
       - backend
 
 volumes:
-  uptime-data:
+  postgres-data:
     driver: local

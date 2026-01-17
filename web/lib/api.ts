@@ -340,7 +340,25 @@ class ApiClient {
     if (password) {
       headers['X-Status-Page-Password'] = password;
     }
-    return this.request<PublicStatusPage>(`/status/${slug}`, { headers });
+    return this.request<PublicStatusPage>(`/api/status/${slug}`, { headers });
+  }
+
+  async getPublicStatusPageHeartbeats(
+    slug: string,
+    monitorId: number,
+    options?: { limit?: number; period?: '1h' }
+  ): Promise<Heartbeat[]> {
+    const params = new URLSearchParams();
+    if (options?.limit) {
+      params.append('limit', options.limit.toString());
+    }
+    if (options?.period) {
+      params.append('period', options.period);
+    }
+    const queryString = params.toString();
+    const url = `/api/status/${slug}/monitors/${monitorId}/heartbeats${queryString ? `?${queryString}` : ''}`;
+    const result = await this.request<Heartbeat[] | null>(url);
+    return result || [];
   }
 
   async getIncidents(statusPageId: number): Promise<Incident[]> {
@@ -511,6 +529,12 @@ export interface CreateIncidentRequest {
 
 export interface MonitorWithStatus extends Monitor {
   last_heartbeat?: Heartbeat;
+  history?: StatusHistoryBucket[];
+}
+
+export interface StatusHistoryBucket {
+  start: string;
+  status: number;
 }
 
 export interface PublicStatusPage {

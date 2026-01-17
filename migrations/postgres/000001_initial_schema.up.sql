@@ -1,0 +1,175 @@
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    active BOOLEAN DEFAULT true,
+    totp_secret TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Monitors table
+CREATE TABLE IF NOT EXISTS monitors (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    url TEXT,
+    interval INTEGER DEFAULT 60,
+    timeout INTEGER DEFAULT 30,
+    active BOOLEAN DEFAULT true,
+    config TEXT, -- JSON blob for type-specific settings
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_monitors_user_id ON monitors(user_id);
+CREATE INDEX IF NOT EXISTS idx_monitors_type ON monitors(type);
+CREATE INDEX IF NOT EXISTS idx_monitors_active ON monitors(active);
+
+-- Heartbeats table
+CREATE TABLE IF NOT EXISTS heartbeats (
+    id SERIAL PRIMARY KEY,
+    monitor_id INTEGER NOT NULL,
+    status INTEGER NOT NULL, -- 0=down, 1=up, 2=pending, 3=maintenance
+    ping INTEGER, -- milliseconds
+    important BOOLEAN DEFAULT false,
+    message TEXT,
+    time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_heartbeats_monitor_time ON heartbeats(monitor_id, time DESC);
+CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON heartbeats(time);
+
+-- Statistics tables
+CREATE TABLE IF NOT EXISTS stat_minutely (
+    id SERIAL PRIMARY KEY,
+    monitor_id INTEGER NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    ping_min INTEGER,
+    ping_max INTEGER,
+    ping_avg REAL,
+    up_count INTEGER,
+    down_count INTEGER,
+    uptime_percentage REAL,
+    UNIQUE(monitor_id, timestamp),
+    FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stat_minutely_monitor_time ON stat_minutely(monitor_id, timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS stat_hourly (
+    id SERIAL PRIMARY KEY,
+    monitor_id INTEGER NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    ping_min INTEGER,
+    ping_max INTEGER,
+    ping_avg REAL,
+    up_count INTEGER,
+    down_count INTEGER,
+    uptime_percentage REAL,
+    UNIQUE(monitor_id, timestamp),
+    FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stat_hourly_monitor_time ON stat_hourly(monitor_id, timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS stat_daily (
+    id SERIAL PRIMARY KEY,
+    monitor_id INTEGER NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    ping_min INTEGER,
+    ping_max INTEGER,
+    ping_avg REAL,
+    up_count INTEGER,
+    down_count INTEGER,
+    uptime_percentage REAL,
+    UNIQUE(monitor_id, timestamp),
+    FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stat_daily_monitor_time ON stat_daily(monitor_id, timestamp DESC);
+
+-- Notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    config TEXT NOT NULL, -- JSON blob
+    is_default BOOLEAN DEFAULT false,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+
+-- Monitor-Notification mapping
+CREATE TABLE IF NOT EXISTS monitor_notifications (
+    monitor_id INTEGER NOT NULL,
+    notification_id INTEGER NOT NULL,
+    PRIMARY KEY (monitor_id, notification_id),
+    FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE,
+    FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE
+);
+
+-- Status pages table
+CREATE TABLE IF NOT EXISTS status_pages (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    description TEXT,
+    published BOOLEAN DEFAULT false,
+    show_powered_by BOOLEAN DEFAULT true,
+    theme TEXT DEFAULT 'light',
+    custom_css TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_status_pages_user_id ON status_pages(user_id);
+CREATE INDEX IF NOT EXISTS idx_status_pages_slug ON status_pages(slug);
+
+-- Status Page-Monitor mapping
+CREATE TABLE IF NOT EXISTS status_page_monitors (
+    status_page_id INTEGER NOT NULL,
+    monitor_id INTEGER NOT NULL,
+    PRIMARY KEY (status_page_id, monitor_id),
+    FOREIGN KEY (status_page_id) REFERENCES status_pages(id) ON DELETE CASCADE,
+    FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
+);
+
+-- Incidents table
+CREATE TABLE IF NOT EXISTS incidents (
+    id SERIAL PRIMARY KEY,
+    status_page_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    style TEXT DEFAULT 'info',
+    pin BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (status_page_id) REFERENCES status_pages(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_incidents_status_page ON incidents(status_page_id);
+
+-- API keys table
+CREATE TABLE IF NOT EXISTS api_keys (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    key TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(key);

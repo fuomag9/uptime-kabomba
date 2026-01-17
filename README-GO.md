@@ -6,7 +6,7 @@ A modern uptime monitoring solution built with Go for the backend and Next.js fo
 
 - **Backend**: Go 1.23+ with Chi router
 - **Frontend**: Next.js 15 with TypeScript
-- **Database**: SQLite (default) or PostgreSQL
+- **Database**: PostgreSQL
 - **Real-time**: WebSocket (custom protocol)
 
 ## Project Structure
@@ -34,7 +34,7 @@ A modern uptime monitoring solution built with Go for the backend and Next.js fo
 
 - Go 1.23+
 - Node.js 20+
-- SQLite 3 or PostgreSQL 16+
+- PostgreSQL 16+
 
 ### Setup
 
@@ -43,12 +43,7 @@ A modern uptime monitoring solution built with Go for the backend and Next.js fo
 go mod download
 ```
 
-2. Create data directory:
-```bash
-mkdir -p data
-```
-
-3. Run the server:
+2. Run the server:
 ```bash
 go run cmd/server/main.go
 ```
@@ -59,8 +54,8 @@ go run cmd/server/main.go
 
 ```bash
 PORT=8080
-DB_TYPE=sqlite                    # or postgres
-DB_DSN=./data/kuma.db            # or postgresql://user:pass@localhost/kuma
+DB_TYPE=postgres
+DB_DSN=host=localhost user=uptime password=secret dbname=uptime sslmode=disable
 DB_MAX_OPEN_CONNS=25
 DB_MAX_IDLE_CONNS=5
 JWT_SECRET=your-secret-here
@@ -121,7 +116,7 @@ Messages are JSON with this format:
 ### Phase 1: Foundation ✅ (Current)
 - [x] Go project setup
 - [x] Chi router with middleware
-- [x] Database layer (SQLite + PostgreSQL)
+- [x] Database layer (PostgreSQL)
 - [x] JWT authentication
 - [x] WebSocket hub
 - [x] Background job scheduler

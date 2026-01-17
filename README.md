@@ -90,7 +90,7 @@ docker-compose down -v
 **Prerequisites:**
 - Go 1.23+
 - Node.js 20+
-- SQLite3 or PostgreSQL
+- PostgreSQL
 
 **Backend:**
 ```bash
@@ -98,8 +98,8 @@ docker-compose down -v
 go mod download
 
 # Run migrations
-export DATABASE_TYPE=sqlite
-export DATABASE_DSN=./data/uptime.db
+export DATABASE_TYPE=postgres
+export DATABASE_DSN=host=localhost user=uptime password=secret dbname=uptime sslmode=disable
 export JWT_SECRET=your-secret-key
 
 # Build and run
@@ -121,17 +121,12 @@ npm start
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_TYPE` | `sqlite` | Database type (sqlite, postgres) |
-| `DATABASE_DSN` | `./data/uptime.db` | Database connection string |
+| `DATABASE_TYPE` | `postgres` | Database type (postgres) |
+| `DATABASE_DSN` | `host=localhost user=uptime password=secret dbname=uptime sslmode=disable` | Database connection string |
 | `PORT` | `8080` | Backend internal port (not exposed to host) |
 | `JWT_SECRET` | *required* | Secret key for JWT tokens |
 
 ### Database Connection Strings
-
-**SQLite:**
-```
-DATABASE_DSN=./data/uptime.db
-```
 
 **PostgreSQL:**
 ```
@@ -342,7 +337,6 @@ The system runs several automated background jobs:
 - **Daily Stats Aggregation** (daily at 2:00 AM): Aggregates into `stat_daily`
 - **Heartbeat Cleanup** (daily at 3:14 AM): Removes heartbeats older than 90 days
 - **Stats Cleanup** (daily at 3:30 AM): Removes stats older than 1-2 years
-- **Database Vacuum** (Sunday at 2:30 AM): Optimizes SQLite database
 
 ## Performance Characteristics
 

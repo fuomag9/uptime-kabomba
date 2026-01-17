@@ -23,7 +23,7 @@ type Config struct {
 
 // DatabaseConfig holds database configuration
 type DatabaseConfig struct {
-	Type         string // sqlite, postgres
+	Type         string // postgres
 	DSN          string
 	MaxOpenConns int
 	MaxIdleConns int
@@ -48,8 +48,8 @@ func Load() *Config {
 	cfg := &Config{
 		Port: getEnvInt("PORT", 8080),
 		Database: DatabaseConfig{
-			Type:         getEnv("DATABASE_TYPE", "sqlite"),
-			DSN:          getEnv("DATABASE_DSN", "/data/uptime.db"),
+			Type:         getEnv("DATABASE_TYPE", "postgres"),
+			DSN:          getEnv("DATABASE_DSN", "host=localhost user=uptime password=secret dbname=uptime sslmode=disable"),
 			MaxOpenConns: getEnvInt("DB_MAX_OPEN_CONNS", 25),
 			MaxIdleConns: getEnvInt("DB_MAX_IDLE_CONNS", 5),
 		},
@@ -93,6 +93,10 @@ func (c *Config) Validate() error {
 
 	if len(c.CORSOrigins) == 0 {
 		return fmt.Errorf("at least one CORS origin must be configured")
+	}
+
+	if c.Database.Type != "postgres" {
+		return fmt.Errorf("unsupported database type: %s", c.Database.Type)
 	}
 
 	// Validate OAuth config if enabled

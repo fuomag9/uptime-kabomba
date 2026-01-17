@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -12,6 +12,20 @@ export default function SetupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const checkSetupStatus = async () => {
+      try {
+        const status = await apiClient.getSetupStatus();
+        if (status.setupComplete) {
+          router.replace('/login');
+        }
+      } catch (err: any) {
+        console.error('Error checking setup status:', err);
+      }
+    };
+    checkSetupStatus();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

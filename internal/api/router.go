@@ -78,6 +78,9 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 		r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/setup", HandleSetup(db, cfg))
 		r.Get("/auth/status", HandleGetSetupStatus(db))
 
+		// Public status page endpoint (no auth required)
+		r.Get("/status/{slug}", HandleGetPublicStatusPage(db))
+
 		// OAuth routes (if enabled)
 		if oauthClient != nil {
 			r.Get("/auth/oauth/config", HandleGetOAuthConfig(cfg))
@@ -139,6 +142,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 
 	// Public status page endpoint (no auth required)
 	r.Get("/status/{slug}", HandleGetPublicStatusPage(db))
+	r.Get("/api/status/{slug}/monitors/{id}/heartbeats", HandleGetPublicStatusPageHeartbeats(db))
 
 	// Prometheus metrics endpoint (no auth required)
 	r.Get("/metrics", HandlePrometheusMetrics(db))

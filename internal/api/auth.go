@@ -106,6 +106,17 @@ func HandleLogout() http.HandlerFunc {
 // HandleSetup handles initial setup
 func HandleSetup(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var count int64
+		if err := db.Model(&models.User{}).Count(&count).Error; err != nil {
+			log.Println("Error checking user count:", err.Error())
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+		if count > 0 {
+			http.Error(w, "Setup already completed", http.StatusForbidden)
+			return
+		}
+
 		var req LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request", http.StatusBadRequest)

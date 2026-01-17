@@ -127,11 +127,9 @@ func HandlePrometheusMetrics(db *gorm.DB) http.HandlerFunc {
 		fmt.Fprintln(w, "# TYPE uptime_system_total_heartbeats counter")
 		fmt.Fprintf(w, "uptime_system_total_heartbeats %d\n", totalHeartbeats)
 
-		// Database size (SQLite specific)
-		var pageCount, pageSize int
-		db.Raw("PRAGMA page_count").Scan(&pageCount)
-		db.Raw("PRAGMA page_size").Scan(&pageSize)
-		dbSize := pageCount * pageSize
+		// Database size (PostgreSQL)
+		var dbSize int64
+		db.Raw("SELECT pg_database_size(current_database())").Scan(&dbSize)
 		fmt.Fprintln(w, "# HELP uptime_system_database_size_bytes Database size in bytes")
 		fmt.Fprintln(w, "# TYPE uptime_system_database_size_bytes gauge")
 		fmt.Fprintf(w, "uptime_system_database_size_bytes %d\n", dbSize)

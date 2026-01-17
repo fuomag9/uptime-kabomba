@@ -1,0 +1,1 @@
+-- No-op migration (tables already exist in 000001_initial_schema.up.sql)
