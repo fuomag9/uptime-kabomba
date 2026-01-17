@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strconv"
 )
@@ -49,7 +50,7 @@ func Load() *Config {
 		Port: getEnvInt("PORT", 8080),
 		Database: DatabaseConfig{
 			Type:         getEnv("DATABASE_TYPE", "postgres"),
-			DSN:          getEnv("DATABASE_DSN", "host=localhost user=uptime password=secret dbname=uptime sslmode=disable"),
+			DSN:          getEnv("DATABASE_DSN", buildPostgresDSN()),
 			MaxOpenConns: getEnvInt("DB_MAX_OPEN_CONNS", 25),
 			MaxIdleConns: getEnvInt("DB_MAX_IDLE_CONNS", 5),
 		},
@@ -67,6 +68,28 @@ func Load() *Config {
 	}
 
 	return cfg
+}
+
+func buildPostgresDSN() string {
+	host := getEnv("POSTGRES_HOST", "localhost")
+	port := getEnv("POSTGRES_PORT", "5432")
+	user := getEnv("POSTGRES_USER", "uptime")
+	password := getEnv("POSTGRES_PASSWORD", "secret")
+	dbName := getEnv("POSTGRES_DB", "uptime")
+	sslMode := getEnv("POSTGRES_SSLMODE", "disable")
+
+	u := url.URL{
+		Scheme: "postgresql",
+		User:   url.UserPassword(user, password),
+		Host:   fmt.Sprintf("%s:%s", host, port),
+		Path:   dbName,
+	}
+
+	query := u.Query()
+	query.Set("sslmode", sslMode)
+	u.RawQuery = query.Encode()
+
+	return u.String()
 }
 
 // Validate validates the configuration

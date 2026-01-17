@@ -39,7 +39,12 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Set environment variables
 ENV DATABASE_TYPE=postgres \
-    DATABASE_DSN=host=postgres user=uptime password=secret dbname=uptime sslmode=disable \
+    POSTGRES_HOST=postgres \
+    POSTGRES_PORT=5432 \
+    POSTGRES_DB=uptime \
+    POSTGRES_USER=uptime \
+    POSTGRES_PASSWORD=secret \
+    POSTGRES_SSLMODE=disable \
     PORT=8080
 
 # Run the application

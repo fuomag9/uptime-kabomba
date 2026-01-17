@@ -55,7 +55,12 @@ go run cmd/server/main.go
 ```bash
 PORT=8080
 DB_TYPE=postgres
-DB_DSN=host=localhost user=uptime password=secret dbname=uptime sslmode=disable
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=uptime
+POSTGRES_USER=uptime
+POSTGRES_PASSWORD=secret
+POSTGRES_SSLMODE=disable
 DB_MAX_OPEN_CONNS=25
 DB_MAX_IDLE_CONNS=5
 JWT_SECRET=your-secret-here

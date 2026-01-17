@@ -19,7 +19,12 @@ services:
     # No ports exposed - only accessible via Docker internal network
     environment:
       - DATABASE_TYPE=postgres
-      - DATABASE_DSN=host=postgres user=uptime password=secret dbname=uptime sslmode=disable
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-uptime}
+      - POSTGRES_USER=${POSTGRES_USER:-uptime}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secret}
+      - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-disable}
       - PORT=8080
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - JWT_SECRET=${JWT_SECRET}

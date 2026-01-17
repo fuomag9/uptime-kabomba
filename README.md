@@ -99,7 +99,12 @@ go mod download
 
 # Run migrations
 export DATABASE_TYPE=postgres
-export DATABASE_DSN=host=localhost user=uptime password=secret dbname=uptime sslmode=disable
+export POSTGRES_HOST=localhost
+export POSTGRES_PORT=5432
+export POSTGRES_DB=uptime
+export POSTGRES_USER=uptime
+export POSTGRES_PASSWORD=secret
+export POSTGRES_SSLMODE=disable
 export JWT_SECRET=your-secret-key
 
 # Build and run
@@ -122,15 +127,31 @@ npm start
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_TYPE` | `postgres` | Database type (postgres) |
-| `DATABASE_DSN` | `host=localhost user=uptime password=secret dbname=uptime sslmode=disable` | Database connection string |
+| `DATABASE_DSN` | *(optional)* | Database connection string (overrides POSTGRES_* vars) |
+| `POSTGRES_HOST` | `localhost` | Postgres host |
+| `POSTGRES_PORT` | `5432` | Postgres port |
+| `POSTGRES_DB` | `uptime` | Postgres database name |
+| `POSTGRES_USER` | `uptime` | Postgres user |
+| `POSTGRES_PASSWORD` | `secret` | Postgres password |
+| `POSTGRES_SSLMODE` | `disable` | Postgres SSL mode |
 | `PORT` | `8080` | Backend internal port (not exposed to host) |
 | `JWT_SECRET` | *required* | Secret key for JWT tokens |
 
 ### Database Connection Strings
 
-**PostgreSQL:**
+**PostgreSQL (via env vars):**
 ```
-DATABASE_DSN=host=localhost user=uptime password=secret dbname=uptime sslmode=disable
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=uptime
+POSTGRES_USER=uptime
+POSTGRES_PASSWORD=secret
+POSTGRES_SSLMODE=disable
+```
+
+**PostgreSQL (single DSN override):**
+```
+DATABASE_DSN=postgresql://uptime:secret@localhost:5432/uptime?sslmode=disable
 ```
 
 ## API Documentation

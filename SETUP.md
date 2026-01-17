@@ -130,7 +130,12 @@ ENVIRONMENT=development
 
 # Database (PostgreSQL)
 DB_TYPE=postgres
-DB_DSN=postgresql://kuma:kuma@localhost:5432/kuma?sslmode=disable
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=uptime
+POSTGRES_USER=uptime
+POSTGRES_PASSWORD=secret
+POSTGRES_SSLMODE=disable
 
 # Database Connection Pool
 DB_MAX_OPEN_CONNS=25
@@ -170,7 +175,12 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
 2. **Update environment variables**
    ```bash
    DB_TYPE=postgres
-DB_DSN=postgresql://kuma:kuma@localhost:5432/kuma?sslmode=disable
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=uptime
+POSTGRES_USER=uptime
+POSTGRES_PASSWORD=secret
+POSTGRES_SSLMODE=disable
    ```
 
 3. **Restart backend**
