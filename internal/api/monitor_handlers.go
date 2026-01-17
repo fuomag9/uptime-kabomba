@@ -292,23 +292,75 @@ func HandleDeleteMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc
 	}
 }
 
-// HandleGetHeartbeats returns heartbeats for a monitor
+// HandleGetHeartbeats returns heartbeats for a monitor with optional period filtering
 func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		monitorID := chi.URLParam(r, "id")
 
-		// Get limit from query params (default 100)
+		// Get query params
 		limitStr := r.URL.Query().Get("limit")
+		period := r.URL.Query().Get("period")
+		startTimeStr := r.URL.Query().Get("start_time")
+		endTimeStr := r.URL.Query().Get("end_time")
+
+		// Set default limit based on period
 		limit := 100
 		if limitStr != "" {
-			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 1000 {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 5000 {
 				limit = l
+			}
+		} else if period != "" {
+			// Default limits based on period
+			switch period {
+			case "24h":
+				limit = 200
+			case "7d":
+				limit = 500
+			case "30d":
+				limit = 1000
+			case "90d":
+				limit = 2000
 			}
 		}
 
+		query := db.Where("monitor_id = ?", monitorID)
+
+		// Apply time filtering based on period or custom range
+		if period != "" {
+			endTime := time.Now()
+			var startTime time.Time
+
+			switch period {
+			case "24h":
+				startTime = endTime.Add(-24 * time.Hour)
+			case "7d":
+				startTime = endTime.Add(-7 * 24 * time.Hour)
+			case "30d":
+				startTime = endTime.Add(-30 * 24 * time.Hour)
+			case "90d":
+				startTime = endTime.Add(-90 * 24 * time.Hour)
+			default:
+				startTime = endTime.Add(-24 * time.Hour) // Default to 24h
+			}
+
+			query = query.Where("time >= ? AND time <= ?", startTime, endTime)
+		} else if startTimeStr != "" && endTimeStr != "" {
+			// Custom date range
+			startTime, err := time.Parse(time.RFC3339, startTimeStr)
+			if err != nil {
+				http.Error(w, "Invalid start_time format (use RFC3339)", http.StatusBadRequest)
+				return
+			}
+			endTime, err := time.Parse(time.RFC3339, endTimeStr)
+			if err != nil {
+				http.Error(w, "Invalid end_time format (use RFC3339)", http.StatusBadRequest)
+				return
+			}
+			query = query.Where("time >= ? AND time <= ?", startTime, endTime)
+		}
+
 		var heartbeats []monitor.Heartbeat
-		err := db.Where("monitor_id = ?", monitorID).
-			Order("time DESC").
+		err := query.Order("time DESC").
 			Limit(limit).
 			Find(&heartbeats).Error
 

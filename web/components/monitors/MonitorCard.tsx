@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from 'react';
 import { MonitorWithStatus } from '@/lib/api';
 import Link from 'next/link';
 import { useMonitorHeartbeat } from '@/hooks/useMonitorHeartbeats';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
+import PeriodSelector from '@/components/ui/PeriodSelector';
 
 interface MonitorCardProps {
   monitor: MonitorWithStatus;
@@ -20,13 +22,15 @@ const STATUS_COLORS = {
 };
 
 export default function MonitorCard({ monitor, latestPing, uptime }: MonitorCardProps) {
+  const [period, setPeriod] = useState<'24h' | '7d' | '30d' | '90d'>('7d');
+
   // Get real-time heartbeat
   const heartbeat = useMonitorHeartbeat(monitor.id);
 
-  // Fetch recent heartbeats for the bar chart
+  // Fetch recent heartbeats for the bar chart based on selected period
   const { data: heartbeats = [] } = useQuery({
-    queryKey: ['heartbeats', monitor.id],
-    queryFn: () => apiClient.getHeartbeats(monitor.id, 50),
+    queryKey: ['heartbeats', monitor.id, period],
+    queryFn: () => apiClient.getHeartbeats(monitor.id, { period, limit: 50 }),
     refetchInterval: 60000, // Refetch every minute
   });
 
@@ -80,29 +84,41 @@ export default function MonitorCard({ monitor, latestPing, uptime }: MonitorCard
           </div>
         </div>
 
-        {/* Heartbeat bar */}
-        <div className="mt-4 h-8 flex items-end gap-0.5">
-          {heartbeats.length > 0 ? (
-            heartbeats.slice(0, 50).reverse().map((hb, i) => {
-              const hbStatusStyle = STATUS_COLORS[hb.status as keyof typeof STATUS_COLORS];
-              return (
+        {/* Period selector and Heartbeat bar */}
+        <div className="mt-4">
+          <div
+            className="mb-2"
+            onClick={(e) => e.preventDefault()}
+          >
+            <PeriodSelector
+              value={period}
+              onChange={(p) => setPeriod(p as '24h' | '7d' | '30d' | '90d')}
+              compact
+            />
+          </div>
+          <div className="h-8 flex items-end gap-0.5">
+            {heartbeats.length > 0 ? (
+              heartbeats.slice(0, 50).reverse().map((hb, i) => {
+                const hbStatusStyle = STATUS_COLORS[hb.status as keyof typeof STATUS_COLORS];
+                return (
+                  <div
+                    key={hb.id || i}
+                    className={`flex-1 rounded-sm ${hbStatusStyle.bar}`}
+                    style={{ height: '100%' }}
+                    title={`${hbStatusStyle.label} - ${hb.ping}ms`}
+                  />
+                );
+              })
+            ) : (
+              Array.from({ length: 50 }).map((_, i) => (
                 <div
-                  key={hb.id || i}
-                  className={`flex-1 rounded-sm ${hbStatusStyle.bar}`}
+                  key={i}
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-sm"
                   style={{ height: '100%' }}
-                  title={`${hbStatusStyle.label} - ${hb.ping}ms`}
                 />
-              );
-            })
-          ) : (
-            Array.from({ length: 50 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-sm"
-                style={{ height: '100%' }}
-              />
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
       </div>
     </Link>

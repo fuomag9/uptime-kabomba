@@ -1,10 +1,13 @@
 package jobs
 
 import (
+	"fmt"
 	"log"
 
 	"gorm.io/gorm"
 	"github.com/robfig/cron/v3"
+
+	"github.com/fuomag9/uptime-kabomba/internal/models"
 )
 
 // Scheduler manages background jobs
@@ -64,43 +67,142 @@ func (s *Scheduler) Stop() {
 	log.Println("Job scheduler stopped")
 }
 
-// cleanupOldHeartbeats removes old heartbeat data
+// cleanupOldHeartbeats removes old heartbeat data based on user settings
 func (s *Scheduler) cleanupOldHeartbeats() {
-	// Keep heartbeats for last 90 days
-	query := `
-		DELETE FROM heartbeats
-		WHERE important = false
-		AND time < datetime('now', '-90 days')
-	`
+	// Get all user settings
+	var settings []models.UserSettings
+	s.db.Find(&settings)
 
-	result := s.db.Exec(query)
-	if result.Error != nil {
-		log.Printf("Failed to cleanup old heartbeats: %v", result.Error)
-		return
+	// Create a map of user ID to retention days
+	userRetention := make(map[int]int)
+	for _, setting := range settings {
+		userRetention[setting.UserID] = setting.HeartbeatRetentionDays
 	}
 
-	log.Printf("Cleaned up %d old heartbeats", result.RowsAffected)
+	// Get all users with monitors
+	var users []struct {
+		UserID int
+	}
+	s.db.Model(&models.Monitor{}).Select("DISTINCT user_id").Scan(&users)
+
+	totalCleaned := int64(0)
+
+	for _, user := range users {
+		// Get retention days for this user (default 90 if not configured)
+		retentionDays := 90
+		if days, ok := userRetention[user.UserID]; ok {
+			retentionDays = days
+		}
+
+		// Get monitor IDs for this user
+		var monitorIDs []int
+		s.db.Model(&models.Monitor{}).
+			Where("user_id = ?", user.UserID).
+			Pluck("id", &monitorIDs)
+
+		if len(monitorIDs) == 0 {
+			continue
+		}
+
+		// Delete old heartbeats for these monitors
+		query := fmt.Sprintf(`
+			DELETE FROM heartbeats
+			WHERE important = false
+			AND monitor_id IN (?)
+			AND time < datetime('now', '-%d days')
+		`, retentionDays)
+
+		result := s.db.Exec(query, monitorIDs)
+		if result.Error != nil {
+			log.Printf("Failed to cleanup heartbeats for user %d: %v", user.UserID, result.Error)
+			continue
+		}
+
+		if result.RowsAffected > 0 {
+			log.Printf("User %d: Cleaned up %d heartbeats (retention: %d days)", user.UserID, result.RowsAffected, retentionDays)
+			totalCleaned += result.RowsAffected
+		}
+	}
+
+	log.Printf("Total heartbeats cleaned up: %d", totalCleaned)
 }
 
-// cleanupOldStats removes aggregated stats older than 1 year
+// cleanupOldStats removes aggregated stats based on user settings
 func (s *Scheduler) cleanupOldStats() {
-	// Delete hourly stats older than 1 year
-	hourlyQuery := `DELETE FROM stat_hourly WHERE hour < datetime('now', '-365 days')`
-	result := s.db.Exec(hourlyQuery)
-	if result.Error != nil {
-		log.Printf("Failed to cleanup old hourly stats: %v", result.Error)
-	} else {
-		log.Printf("Cleaned up %d old hourly stats", result.RowsAffected)
+	// Get all user settings
+	var settings []models.UserSettings
+	s.db.Find(&settings)
+
+	// Create maps for user retention settings
+	userHourlyRetention := make(map[int]int)
+	userDailyRetention := make(map[int]int)
+	for _, setting := range settings {
+		userHourlyRetention[setting.UserID] = setting.HourlyStatRetentionDays
+		userDailyRetention[setting.UserID] = setting.DailyStatRetentionDays
 	}
 
-	// Delete daily stats older than 2 years
-	dailyQuery := `DELETE FROM stat_daily WHERE date < date('now', '-730 days')`
-	result = s.db.Exec(dailyQuery)
-	if result.Error != nil {
-		log.Printf("Failed to cleanup old daily stats: %v", result.Error)
-	} else {
-		log.Printf("Cleaned up %d old daily stats", result.RowsAffected)
+	// Get all users with monitors
+	var users []struct {
+		UserID int
 	}
+	s.db.Model(&models.Monitor{}).Select("DISTINCT user_id").Scan(&users)
+
+	totalHourlyCleaned := int64(0)
+	totalDailyCleaned := int64(0)
+
+	for _, user := range users {
+		// Get retention days for this user (defaults: 365 hourly, 730 daily)
+		hourlyRetention := 365
+		if days, ok := userHourlyRetention[user.UserID]; ok {
+			hourlyRetention = days
+		}
+		dailyRetention := 730
+		if days, ok := userDailyRetention[user.UserID]; ok {
+			dailyRetention = days
+		}
+
+		// Get monitor IDs for this user
+		var monitorIDs []int
+		s.db.Model(&models.Monitor{}).
+			Where("user_id = ?", user.UserID).
+			Pluck("id", &monitorIDs)
+
+		if len(monitorIDs) == 0 {
+			continue
+		}
+
+		// Delete old hourly stats
+		hourlyQuery := fmt.Sprintf(`
+			DELETE FROM stat_hourly
+			WHERE monitor_id IN (?)
+			AND hour < datetime('now', '-%d days')
+		`, hourlyRetention)
+
+		result := s.db.Exec(hourlyQuery, monitorIDs)
+		if result.Error != nil {
+			log.Printf("Failed to cleanup hourly stats for user %d: %v", user.UserID, result.Error)
+		} else if result.RowsAffected > 0 {
+			log.Printf("User %d: Cleaned up %d hourly stats (retention: %d days)", user.UserID, result.RowsAffected, hourlyRetention)
+			totalHourlyCleaned += result.RowsAffected
+		}
+
+		// Delete old daily stats
+		dailyQuery := fmt.Sprintf(`
+			DELETE FROM stat_daily
+			WHERE monitor_id IN (?)
+			AND date < date('now', '-%d days')
+		`, dailyRetention)
+
+		result = s.db.Exec(dailyQuery, monitorIDs)
+		if result.Error != nil {
+			log.Printf("Failed to cleanup daily stats for user %d: %v", user.UserID, result.Error)
+		} else if result.RowsAffected > 0 {
+			log.Printf("User %d: Cleaned up %d daily stats (retention: %d days)", user.UserID, result.RowsAffected, dailyRetention)
+			totalDailyCleaned += result.RowsAffected
+		}
+	}
+
+	log.Printf("Total stats cleaned up: %d hourly, %d daily", totalHourlyCleaned, totalDailyCleaned)
 }
 
 // vacuumDatabase runs VACUUM on SQLite database

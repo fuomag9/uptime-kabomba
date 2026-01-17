@@ -4,9 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, Heartbeat } from '@/lib/api';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useMonitorHeartbeat } from '@/hooks/useMonitorHeartbeats';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import PeriodSelector, { PeriodType } from '@/components/ui/PeriodSelector';
+import HeartbeatChart from '@/components/monitors/HeartbeatChart';
 
 // Helper function to format relative time
 function formatRelativeTime(date: Date): string {
@@ -37,7 +39,8 @@ export default function MonitorDetailPage() {
   const monitorId = parseInt(params.id as string);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [hoveredHeartbeat, setHoveredHeartbeat] = useState<{heartbeat: Heartbeat, x: number, y: number} | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('24h');
+  const [customRange, setCustomRange] = useState<{ start: Date; end: Date } | null>(null);
 
   // Connect to WebSocket
   const { connected } = useWebSocket();
@@ -52,10 +55,27 @@ export default function MonitorDetailPage() {
   });
 
   const { data: heartbeats, isLoading: isLoadingHeartbeats } = useQuery({
-    queryKey: ['heartbeats', monitorId],
-    queryFn: () => apiClient.getHeartbeats(monitorId, 100),
-    refetchInterval: 5000, // Refetch every 5 seconds
+    queryKey: ['heartbeats', monitorId, selectedPeriod, customRange?.start?.toISOString(), customRange?.end?.toISOString()],
+    queryFn: () => {
+      if (selectedPeriod === 'custom' && customRange) {
+        return apiClient.getHeartbeats(monitorId, {
+          startTime: customRange.start.toISOString(),
+          endTime: customRange.end.toISOString(),
+        });
+      }
+      return apiClient.getHeartbeats(monitorId, {
+        period: selectedPeriod as '24h' | '7d' | '30d' | '90d',
+      });
+    },
+    refetchInterval: selectedPeriod === '24h' ? 5000 : 30000, // Faster refresh for 24h
   });
+
+  const handlePeriodChange = (period: PeriodType, range?: { start: Date; end: Date }) => {
+    setSelectedPeriod(period);
+    if (period === 'custom' && range) {
+      setCustomRange(range);
+    }
+  };
 
   const deleteMutation = useMutation({
     mutationFn: () => apiClient.deleteMonitor(monitorId),
@@ -135,21 +155,7 @@ export default function MonitorDetailPage() {
     }
   }
 
-  // Calculate dynamic scale for heartbeat visualization
-  let minPing = 0;
-  let maxPing = 100;
-  if (heartbeats && heartbeats.length > 0) {
-    const validPings = heartbeats.filter(h => h.ping > 0).map(h => h.ping);
-    if (validPings.length > 0) {
-      minPing = Math.min(...validPings);
-      maxPing = Math.max(...validPings);
-      // Add 10% padding to max for better visualization
-      const padding = (maxPing - minPing) * 0.1;
-      maxPing = maxPing + padding;
-      minPing = Math.max(0, minPing - padding);
-    }
-  }
-
+  
   return (
     <div>
       {/* Header */}
@@ -227,121 +233,25 @@ export default function MonitorDetailPage() {
 
       {/* Heartbeat History */}
       <div className="mt-8">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-          Heartbeat History
-          <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-            Last 100 checks
-          </span>
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Response Time
+            <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+              {heartbeats?.length || 0} checks
+            </span>
+          </h2>
+          <PeriodSelector
+            value={selectedPeriod}
+            onChange={handlePeriodChange}
+            customStart={customRange?.start}
+            customEnd={customRange?.end}
+          />
+        </div>
 
-        {/* Heartbeat Bar */}
+        {/* Recharts Graph */}
         {heartbeats && heartbeats.length > 0 && (
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg dark:shadow-2xl p-6 mb-6 relative">
-            <div className="flex gap-4">
-              {/* Y-axis scale */}
-              <div className="flex flex-col justify-between text-xs text-gray-500 dark:text-gray-400 font-mono w-12 text-right pr-2">
-                <span className="text-green-500 dark:text-green-400 font-semibold">{Math.round(maxPing)}ms</span>
-                <span>{Math.round((maxPing + minPing) / 2)}ms</span>
-                <span className="text-gray-400 dark:text-gray-600">{Math.round(minPing)}ms</span>
-              </div>
-
-              {/* Chart area */}
-              <div className="flex-1 relative">
-                {/* Grid lines */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                  <div className="border-t border-dashed border-gray-300 dark:border-gray-700"></div>
-                  <div className="border-t border-dashed border-gray-300 dark:border-gray-700"></div>
-                  <div className="border-t border-dashed border-gray-300 dark:border-gray-700"></div>
-                </div>
-
-                {/* Bars */}
-                <div className="h-48 flex items-end gap-[2px] relative z-10">
-                  {heartbeats.slice(0, 100).reverse().map((heartbeat: Heartbeat, i: number) => {
-                    const status = STATUS_COLORS[heartbeat.status as keyof typeof STATUS_COLORS];
-                    // Calculate height based on dynamic scale
-                    let heightPercent = 5; // minimum height for visibility
-                    if (heartbeat.ping > 0 && maxPing > minPing) {
-                      heightPercent = Math.max(5, ((heartbeat.ping - minPing) / (maxPing - minPing)) * 100);
-                    }
-
-                    return (
-                      <div
-                        key={heartbeat.id}
-                        className={`flex-1 ${status.dot} rounded-t-md hover:opacity-90 transition-all cursor-pointer hover:scale-y-105 hover:shadow-lg`}
-                        style={{
-                          height: `${heightPercent}%`,
-                          minHeight: '6px'
-                        }}
-                        onMouseEnter={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setHoveredHeartbeat({
-                            heartbeat,
-                            x: rect.left + rect.width / 2,
-                            y: rect.top
-                          });
-                        }}
-                        onMouseLeave={() => setHoveredHeartbeat(null)}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex justify-between items-center">
-              <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
-                <span>← Oldest</span>
-                <span className="text-gray-400 dark:text-gray-600">|</span>
-                <span>Latest →</span>
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                <span className="font-medium">Range:</span> {Math.round(minPing)}ms - {Math.round(maxPing)}ms
-              </div>
-            </div>
-
-            {/* Fancy Tooltip */}
-            {hoveredHeartbeat && (
-              <div
-                className="fixed z-50 pointer-events-none"
-                style={{
-                  left: `${hoveredHeartbeat.x}px`,
-                  top: `${hoveredHeartbeat.y - 10}px`,
-                  transform: 'translate(-50%, -100%)'
-                }}
-              >
-                <div className="bg-gray-900 dark:bg-black text-white rounded-lg shadow-2xl p-4 border border-gray-700 dark:border-gray-600 min-w-[250px]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-3 h-3 rounded-full ${STATUS_COLORS[hoveredHeartbeat.heartbeat.status as keyof typeof STATUS_COLORS].dot}`}></div>
-                    <span className="font-semibold text-lg">
-                      {STATUS_COLORS[hoveredHeartbeat.heartbeat.status as keyof typeof STATUS_COLORS].label}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5 text-sm">
-                    <div className="flex justify-between gap-4">
-                      <span className="text-gray-400">Response Time:</span>
-                      <span className="font-mono font-medium text-green-400">{hoveredHeartbeat.heartbeat.ping}ms</span>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <span className="text-gray-400">Time:</span>
-                      <span className="font-medium">{formatRelativeTime(new Date(hoveredHeartbeat.heartbeat.time))}</span>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <span className="text-gray-400">Exact:</span>
-                      <span className="text-xs">{new Date(hoveredHeartbeat.heartbeat.time).toLocaleString()}</span>
-                    </div>
-                    {hoveredHeartbeat.heartbeat.message && (
-                      <div className="mt-2 pt-2 border-t border-gray-700">
-                        <div className="text-gray-400 text-xs mb-1">Message:</div>
-                        <div className="text-gray-200 break-words">{hoveredHeartbeat.heartbeat.message}</div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
-                    <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-gray-900 dark:border-t-black"></div>
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg dark:shadow-2xl p-6 mb-6">
+            <HeartbeatChart heartbeats={heartbeats} height={300} />
           </div>
         )}
 

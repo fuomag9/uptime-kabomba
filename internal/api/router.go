@@ -93,6 +93,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 			// User routes
 			r.Get("/user/me", HandleGetCurrentUser(db))
 
+			// Settings routes
+			r.Get("/settings", HandleGetUserSettings(db))
+			r.Put("/settings", HandleUpdateUserSettings(db))
+
 			// Monitor routes
 			r.Get("/monitors", HandleGetMonitors(db))
 			r.Post("/monitors", HandleCreateMonitor(db, executor))

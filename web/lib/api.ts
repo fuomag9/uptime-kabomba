@@ -214,10 +214,47 @@ class ApiClient {
     );
   }
 
-  async getHeartbeats(monitorId: number, limit?: number): Promise<Heartbeat[]> {
-    const params = limit ? `?limit=${limit}` : '';
-    const result = await this.request<Heartbeat[] | null>(`/api/monitors/${monitorId}/heartbeats${params}`);
+  async getHeartbeats(
+    monitorId: number,
+    options?: {
+      limit?: number;
+      period?: '24h' | '7d' | '30d' | '90d';
+      startTime?: string;
+      endTime?: string;
+    }
+  ): Promise<Heartbeat[]> {
+    const params = new URLSearchParams();
+    if (options?.limit) {
+      params.append('limit', options.limit.toString());
+    }
+    if (options?.period) {
+      params.append('period', options.period);
+    }
+    if (options?.startTime) {
+      params.append('start_time', options.startTime);
+    }
+    if (options?.endTime) {
+      params.append('end_time', options.endTime);
+    }
+    const queryString = params.toString();
+    const url = `/api/monitors/${monitorId}/heartbeats${queryString ? `?${queryString}` : ''}`;
+    const result = await this.request<Heartbeat[] | null>(url);
     return result || [];
+  }
+
+  async getUserSettings(): Promise<UserSettings> {
+    return this.request<UserSettings>('/api/settings');
+  }
+
+  async updateUserSettings(settings: {
+    heartbeat_retention_days: number;
+    hourly_stat_retention_days: number;
+    daily_stat_retention_days: number;
+  }): Promise<UserSettings> {
+    return this.request<UserSettings>('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
   }
 
   // Notification endpoints
@@ -362,6 +399,16 @@ export interface Heartbeat {
   important: boolean;
   message: string;
   time: string;
+}
+
+export interface UserSettings {
+  id: number;
+  user_id: number;
+  heartbeat_retention_days: number;
+  hourly_stat_retention_days: number;
+  daily_stat_retention_days: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // Notification types
