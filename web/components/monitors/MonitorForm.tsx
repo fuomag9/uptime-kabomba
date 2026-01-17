@@ -6,11 +6,13 @@ import { CreateMonitorRequest, Notification, apiClient } from '@/lib/api';
 interface MonitorFormData {
   monitor: CreateMonitorRequest;
   notificationIds: number[];
+  useDefaultNotifications: boolean;
 }
 
 interface MonitorFormProps {
   initialData?: Partial<CreateMonitorRequest>;
   monitorId?: number;
+  notificationsConfigured?: boolean; // true if monitor has explicit config, false if using defaults
   onSubmit: (data: MonitorFormData) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
@@ -26,7 +28,7 @@ const MONITOR_TYPES = [
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
-export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel, isSubmitting }: MonitorFormProps) {
+export default function MonitorForm({ initialData, monitorId, notificationsConfigured, onSubmit, onCancel, isSubmitting }: MonitorFormProps) {
   const [formData, setFormData] = useState<CreateMonitorRequest>({
     name: initialData?.name || '',
     type: initialData?.type || 'http',
@@ -41,6 +43,10 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedNotificationIds, setSelectedNotificationIds] = useState<number[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
+  // Default to using defaults for new monitors, for existing monitors check the flag
+  const [useDefaultNotifications, setUseDefaultNotifications] = useState<boolean>(
+    monitorId ? notificationsConfigured === false : true
+  );
 
   const [httpConfig, setHttpConfig] = useState({
     method: (initialData?.config?.method as string) || 'GET',
@@ -163,6 +169,7 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
         config,
       },
       notificationIds: selectedNotificationIds,
+      useDefaultNotifications,
     });
   };
 
@@ -247,7 +254,7 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
               id="interval"
               value={formData.interval}
               onChange={(e) => setFormData({ ...formData, interval: parseInt(e.target.value) })}
-              min={10}
+              min={1}
               required
               className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
             />
@@ -314,57 +321,132 @@ export default function MonitorForm({ initialData, monitorId, onSubmit, onCancel
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
           Notifications
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Select which notifications to use for this monitor. Default notifications are pre-selected. Unselect all to disable notifications completely.
-        </p>
 
         {loadingNotifications ? (
           <div className="text-sm text-gray-500 dark:text-gray-400">Loading notifications...</div>
         ) : (
-          <div className="space-y-2">
-            {notifications.map((notif) => (
-              <label
-                key={notif.id}
-                className="flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedNotificationIds.includes(notif.id)}
-                  onChange={(e) => {
-                    setSelectedNotificationIds(
-                      e.target.checked
-                        ? [...selectedNotificationIds, notif.id]
-                        : selectedNotificationIds.filter(id => id !== notif.id)
-                    );
-                  }}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <div className="ml-3 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {notif.name}
-                    </span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
-                      {getProviderLabel(notif.type)}
-                    </span>
-                    {notif.is_default && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-                        Default
-                      </span>
-                    )}
-                    {!notif.active && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                        Inactive
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </label>
-            ))}
+          <div className="space-y-4">
+            {/* Use Default Notifications Toggle */}
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <input
+                type="checkbox"
+                id="useDefaults"
+                checked={useDefaultNotifications}
+                onChange={(e) => setUseDefaultNotifications(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div className="flex-1">
+                <label htmlFor="useDefaults" className="text-sm font-medium text-blue-900 dark:text-blue-100 cursor-pointer">
+                  Use default notifications
+                </label>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  {useDefaultNotifications
+                    ? "This monitor will automatically receive all notifications marked as 'Default'. New default notifications will be included automatically."
+                    : "Uncheck to manually select specific notifications or to disable notifications completely."}
+                </p>
+              </div>
+            </div>
 
-            {notifications.length === 0 && (
-              <div className="text-sm text-gray-500 dark:text-gray-400 p-4 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-center">
-                No notifications configured. Visit the Notifications tab to add one.
+            {/* Show notification list only when not using defaults */}
+            {!useDefaultNotifications && (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Select which notifications to use for this monitor. Unselect all to disable notifications completely.
+                  </p>
+                  {notifications.length > 0 && (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNotificationIds(notifications.map(n => n.id))}
+                        className="text-xs px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                      >
+                        Select all
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNotificationIds([])}
+                        className="text-xs px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                      >
+                        Unselect all
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {notifications.map((notif) => (
+                    <label
+                      key={notif.id}
+                      className="flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedNotificationIds.includes(notif.id)}
+                        onChange={(e) => {
+                          setSelectedNotificationIds(
+                            e.target.checked
+                              ? [...selectedNotificationIds, notif.id]
+                              : selectedNotificationIds.filter(id => id !== notif.id)
+                          );
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <div className="ml-3 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">
+                            {notif.name}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                            {getProviderLabel(notif.type)}
+                          </span>
+                          {notif.is_default && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                              Default
+                            </span>
+                          )}
+                          {!notif.active && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+
+                  {notifications.length === 0 && (
+                    <div className="text-sm text-gray-500 dark:text-gray-400 p-4 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-center">
+                      No notifications configured. Visit the Notifications tab to add one.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Show current defaults when using defaults mode */}
+            {useDefaultNotifications && notifications.filter(n => n.is_default).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Current default notifications that will be used:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {notifications.filter(n => n.is_default).map((notif) => (
+                    <span
+                      key={notif.id}
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-sm"
+                    >
+                      {notif.name}
+                      <span className="text-xs opacity-70">({getProviderLabel(notif.type)})</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {useDefaultNotifications && notifications.filter(n => n.is_default).length === 0 && (
+              <div className="text-sm text-amber-700 dark:text-amber-300 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                No default notifications are configured. This monitor will not receive any notifications until you add default notifications or select specific ones.
               </div>
             )}
           </div>

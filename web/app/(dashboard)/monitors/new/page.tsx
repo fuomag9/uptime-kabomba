@@ -10,11 +10,16 @@ export default function NewMonitorPage() {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: async (data: { monitor: CreateMonitorRequest, notificationIds: number[] }) => {
+    mutationFn: async (data: { monitor: CreateMonitorRequest, notificationIds: number[], useDefaultNotifications: boolean }) => {
       const createdMonitor = await apiClient.createMonitor(data.monitor);
-      // Always update notifications to establish explicit configuration
-      // This includes empty arrays to disable notifications completely
-      await apiClient.updateMonitorNotifications(createdMonitor.id, data.notificationIds);
+      // Update notifications based on user preference
+      if (data.useDefaultNotifications) {
+        // Use default notifications - set the flag to false (will use defaults)
+        await apiClient.updateMonitorNotifications(createdMonitor.id, [], true);
+      } else {
+        // Explicit notification configuration
+        await apiClient.updateMonitorNotifications(createdMonitor.id, data.notificationIds, false);
+      }
       return createdMonitor;
     },
     onSuccess: () => {
@@ -23,7 +28,7 @@ export default function NewMonitorPage() {
     },
   });
 
-  const handleSubmit = (data: { monitor: CreateMonitorRequest, notificationIds: number[] }) => {
+  const handleSubmit = (data: { monitor: CreateMonitorRequest, notificationIds: number[], useDefaultNotifications: boolean }) => {
     createMutation.mutate(data);
   };
 

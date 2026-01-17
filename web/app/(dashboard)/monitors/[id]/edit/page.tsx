@@ -18,12 +18,18 @@ export default function EditMonitorPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: UpdateMonitorRequest & { notificationIds?: number[] }) => {
-      const { notificationIds, ...monitorData } = data;
+    mutationFn: async (data: UpdateMonitorRequest & { notificationIds?: number[], useDefaultNotifications?: boolean }) => {
+      const { notificationIds, useDefaultNotifications, ...monitorData } = data;
       await apiClient.updateMonitor(monitorId, monitorData);
-      // Update notifications if provided
-      if (notificationIds !== undefined) {
-        await apiClient.updateMonitorNotifications(monitorId, notificationIds);
+      // Update notifications based on user preference
+      if (useDefaultNotifications !== undefined) {
+        if (useDefaultNotifications) {
+          // Use default notifications
+          await apiClient.updateMonitorNotifications(monitorId, [], true);
+        } else if (notificationIds !== undefined) {
+          // Explicit notification configuration
+          await apiClient.updateMonitorNotifications(monitorId, notificationIds, false);
+        }
       }
     },
     onSuccess: () => {
@@ -90,10 +96,18 @@ export default function EditMonitorPage() {
             url: monitor.url,
             interval: monitor.interval,
             timeout: monitor.timeout,
+            resend_interval: monitor.resend_interval,
+            ip_version: monitor.ip_version,
             config: monitor.config,
           }}
           monitorId={monitorId}
-          onSubmit={(data) => updateMutation.mutate({ ...data.monitor, active: monitor.active, notificationIds: data.notificationIds })}
+          notificationsConfigured={monitor.notifications_configured}
+          onSubmit={(data) => updateMutation.mutate({
+            ...data.monitor,
+            active: monitor.active,
+            notificationIds: data.notificationIds,
+            useDefaultNotifications: data.useDefaultNotifications,
+          })}
           onCancel={() => router.push(`/monitors/${monitorId}`)}
           isSubmitting={updateMutation.isPending}
         />

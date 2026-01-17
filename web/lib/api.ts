@@ -203,13 +203,20 @@ class ApiClient {
 
   async updateMonitorNotifications(
     monitorId: number,
-    notificationIds: number[]
+    notificationIds: number[],
+    useDefaults?: boolean
   ): Promise<Notification[]> {
+    const body: { notification_ids: number[]; use_defaults?: boolean } = {
+      notification_ids: notificationIds,
+    };
+    if (useDefaults !== undefined) {
+      body.use_defaults = useDefaults;
+    }
     return this.request<Notification[]>(
       `/api/monitors/${monitorId}/notifications`,
       {
         method: 'PUT',
-        body: JSON.stringify({ notification_ids: notificationIds }),
+        body: JSON.stringify(body),
       }
     );
   }
@@ -367,6 +374,7 @@ export interface Monitor {
   resend_interval: number;
   ip_version: string;
   active: boolean;
+  notifications_configured: boolean; // true if using explicit config, false if using defaults
   config: Record<string, any>;
   created_at: string;
   updated_at: string;

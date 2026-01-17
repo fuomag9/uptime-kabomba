@@ -429,6 +429,7 @@ func HandleGetMonitorNotifications(db *gorm.DB) http.HandlerFunc {
 // UpdateMonitorNotificationsRequest represents the request body for updating monitor notifications
 type UpdateMonitorNotificationsRequest struct {
 	NotificationIDs []int `json:"notification_ids"`
+	UseDefaults     *bool `json:"use_defaults,omitempty"` // If true, use default notifications (notifications_configured = 0)
 }
 
 // HandleUpdateMonitorNotifications replaces all notification associations for a monitor
@@ -488,16 +489,25 @@ func HandleUpdateMonitorNotifications(db *gorm.DB) http.HandlerFunc {
 				return err
 			}
 
-			// Insert new associations
-			for _, notificationID := range req.NotificationIDs {
-				if err := tx.Exec("INSERT INTO monitor_notifications (monitor_id, notification_id) VALUES (?, ?)", monitorID, notificationID).Error; err != nil {
+			// Check if we should use default notifications
+			if req.UseDefaults != nil && *req.UseDefaults {
+				// Use default notifications - set notifications_configured = 0
+				// This means the dispatcher will use all notifications marked as is_default
+				if err := tx.Exec("UPDATE monitors SET notifications_configured = 0 WHERE id = ?", monitorID).Error; err != nil {
 					return err
 				}
-			}
+			} else {
+				// Insert new associations
+				for _, notificationID := range req.NotificationIDs {
+					if err := tx.Exec("INSERT INTO monitor_notifications (monitor_id, notification_id) VALUES (?, ?)", monitorID, notificationID).Error; err != nil {
+						return err
+					}
+				}
 
-			// Mark monitor as having explicit notification configuration
-			if err := tx.Exec("UPDATE monitors SET notifications_configured = 1 WHERE id = ?", monitorID).Error; err != nil {
-				return err
+				// Mark monitor as having explicit notification configuration
+				if err := tx.Exec("UPDATE monitors SET notifications_configured = 1 WHERE id = ?", monitorID).Error; err != nil {
+					return err
+				}
 			}
 
 			return nil
@@ -510,10 +520,16 @@ func HandleUpdateMonitorNotifications(db *gorm.DB) http.HandlerFunc {
 
 		// Return updated list of notifications
 		var notifications []models.Notification
-		err = db.Table("notifications").
-			Joins("INNER JOIN monitor_notifications ON monitor_notifications.notification_id = notifications.id").
-			Where("monitor_notifications.monitor_id = ? AND notifications.user_id = ?", monitorID, user.ID).
-			Find(&notifications).Error
+		if req.UseDefaults != nil && *req.UseDefaults {
+			// Return default notifications when using defaults mode
+			err = db.Where("user_id = ? AND is_default = ?", user.ID, true).Find(&notifications).Error
+		} else {
+			// Return explicitly linked notifications
+			err = db.Table("notifications").
+				Joins("INNER JOIN monitor_notifications ON monitor_notifications.notification_id = notifications.id").
+				Where("monitor_notifications.monitor_id = ? AND notifications.user_id = ?", monitorID, user.ID).
+				Find(&notifications).Error
+		}
 
 		if err != nil {
 			http.Error(w, "Failed to fetch updated notifications", http.StatusInternalServerError)
