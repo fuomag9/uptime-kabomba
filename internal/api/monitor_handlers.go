@@ -323,6 +323,8 @@ func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 		} else if period != "" {
 			// Default limits based on period
 			switch period {
+			case "1h":
+				limit = 100
 			case "24h":
 				limit = 200
 			case "7d":
@@ -342,6 +344,8 @@ func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 			var startTime time.Time
 
 			switch period {
+			case "1h":
+				startTime = endTime.Add(-1 * time.Hour)
 			case "24h":
 				startTime = endTime.Add(-24 * time.Hour)
 			case "7d":

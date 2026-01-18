@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export type PeriodType = '24h' | '7d' | '30d' | '90d' | 'custom';
+export type PeriodType = '1h' | '24h' | '7d' | '30d' | '90d' | 'custom';
 
 interface PeriodOption {
   value: PeriodType;
@@ -20,6 +20,7 @@ interface PeriodSelectorProps {
 }
 
 const PERIOD_OPTIONS: PeriodOption[] = [
+  { value: '1h', label: '1h', description: 'Last hour' },
   { value: '24h', label: '24h', description: 'Last 24 hours' },
   { value: '7d', label: '7d', description: 'Last 7 days' },
   { value: '30d', label: '30d', description: 'Last 30 days' },

@@ -225,7 +225,7 @@ class ApiClient {
     monitorId: number,
     options?: {
       limit?: number;
-      period?: '24h' | '7d' | '30d' | '90d';
+      period?: '1h' | '24h' | '7d' | '30d' | '90d';
       startTime?: string;
       endTime?: string;
     }

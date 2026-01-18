@@ -64,10 +64,10 @@ export default function MonitorDetailPage() {
         });
       }
       return apiClient.getHeartbeats(monitorId, {
-        period: selectedPeriod as '24h' | '7d' | '30d' | '90d',
+        period: selectedPeriod as '1h' | '24h' | '7d' | '30d' | '90d',
       });
     },
-    refetchInterval: selectedPeriod === '24h' ? 5000 : 30000, // Faster refresh for 24h
+    refetchInterval: selectedPeriod === '1h' || selectedPeriod === '24h' ? 5000 : 30000, // Faster refresh for shorter periods
   });
 
   const handlePeriodChange = (period: PeriodType, range?: { start: Date; end: Date }) => {
