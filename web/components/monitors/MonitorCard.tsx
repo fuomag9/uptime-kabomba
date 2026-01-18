@@ -51,16 +51,17 @@ export default function MonitorCard({ monitor, latestPing, uptime }: MonitorCard
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
                 {statusStyle.label}
               </span>
+              {!monitor.active && (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-sm leading-none">⏸</span>
+                  Paused
+                </span>
+              )}
             </div>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 truncate">
               {monitor.type.toUpperCase()} • {monitor.url}
             </p>
           </div>
-          {!monitor.active && (
-            <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-              Paused
-            </span>
-          )}
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-4">

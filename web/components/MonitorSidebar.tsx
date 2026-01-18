@@ -29,12 +29,15 @@ function MonitorSidebarItem({ monitor }: { monitor: any }) {
       className={`block px-3 py-2 rounded-md text-sm transition-colors ${isActive
         ? 'bg-primary text-white'
         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-        }`}
+        } ${monitor.active ? '' : 'opacity-70'}`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center min-w-0 flex-1">
           <div className={`h-2 w-2 rounded-full ${statusStyle.dot} mr-2 flex-shrink-0`} />
           <span className="truncate">{monitor.name}</span>
+          {!monitor.active && (
+            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">⏸</span>
+          )}
         </div>
         {ping !== undefined && (
           <span className={`ml-2 text-xs flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
@@ -42,13 +45,6 @@ function MonitorSidebarItem({ monitor }: { monitor: any }) {
           </span>
         )}
       </div>
-      {!monitor.active && (
-        <div className="mt-1 ml-4">
-          <span className={`text-xs ${isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-            Paused
-          </span>
-        </div>
-      )}
     </Link>
   );
 }

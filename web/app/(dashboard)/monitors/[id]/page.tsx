@@ -177,7 +177,8 @@ export default function MonitorDetailPage() {
               {statusStyle.label}
             </span>
             {!monitor.active && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+              <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                <span className="text-sm leading-none">⏸</span>
                 Paused
               </span>
             )}
