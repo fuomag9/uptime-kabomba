@@ -85,6 +85,21 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   );
 };
 
+function downsampleData(data: ChartDataPoint[], maxPoints: number): ChartDataPoint[] {
+  if (data.length <= maxPoints) {
+    return data;
+  }
+  const stride = Math.ceil(data.length / maxPoints);
+  const sampled: ChartDataPoint[] = [];
+  for (let i = 0; i < data.length; i += stride) {
+    sampled.push(data[i]);
+  }
+  if (sampled[sampled.length - 1]?.index !== data[data.length - 1]?.index) {
+    sampled.push(data[data.length - 1]);
+  }
+  return sampled;
+}
+
 export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatChartProps) {
   // Transform data for recharts (reverse to show oldest first)
   const chartData: ChartDataPoint[] = heartbeats
@@ -99,6 +114,23 @@ export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatCh
       timestamp: hb.time,
     }));
 
+  let maxPoints = 600;
+  if (chartData.length > 1) {
+    const firstTime = chartData[0].time;
+    const lastTime = chartData[chartData.length - 1].time;
+    const rangeHours = Math.abs(lastTime - firstTime) / (1000 * 60 * 60);
+    if (rangeHours > 168) {
+      maxPoints = 200;
+    } else if (rangeHours > 72) {
+      maxPoints = 300;
+    } else if (rangeHours > 24) {
+      maxPoints = 400;
+    }
+  }
+
+  const displayData = downsampleData(chartData, maxPoints);
+  const shouldAnimate = displayData.length <= 400;
+
   if (chartData.length === 0) {
     return (
       <div
@@ -111,14 +143,14 @@ export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatCh
   }
 
   // Calculate domain for Y axis with padding
-  const maxPing = Math.max(...chartData.map(d => d.ping));
+  const maxPing = Math.max(...displayData.map(d => d.ping));
   const yDomain = [0, Math.ceil(maxPing * 1.2)];
 
   return (
     <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
-          data={chartData}
+          data={displayData}
           margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
         >
           <defs>
@@ -139,7 +171,7 @@ export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatCh
             axisLine={{ stroke: '#4b5563' }}
             tickLine={{ stroke: '#4b5563' }}
             tickFormatter={(value) => {
-              const point = chartData[value];
+              const point = displayData[value];
               return point ? formatTimeShort(point.timestamp) : '';
             }}
             interval="preserveStartEnd"
@@ -164,7 +196,8 @@ export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatCh
             strokeWidth={2}
             fillOpacity={1}
             fill="url(#colorPing)"
-            animationDuration={500}
+            isAnimationActive={shouldAnimate}
+            animationDuration={shouldAnimate ? 500 : 0}
             dot={false}
             activeDot={{
               r: 6,
