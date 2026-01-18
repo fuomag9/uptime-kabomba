@@ -39,7 +39,7 @@ export default function MonitorDetailPage() {
   const monitorId = parseInt(params.id as string);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('24h');
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('1h');
   const [customRange, setCustomRange] = useState<{ start: Date; end: Date } | null>(null);
 
   // Connect to WebSocket
@@ -64,10 +64,10 @@ export default function MonitorDetailPage() {
         });
       }
       return apiClient.getHeartbeats(monitorId, {
-        period: selectedPeriod as '1h' | '24h' | '7d' | '30d' | '90d',
+        period: selectedPeriod as '1h' | '3h' | '6h' | '24h',
       });
     },
-    refetchInterval: selectedPeriod === '1h' || selectedPeriod === '24h' ? 5000 : 30000, // Faster refresh for shorter periods
+    refetchInterval: selectedPeriod === '1h' || selectedPeriod === '3h' || selectedPeriod === '6h' || selectedPeriod === '24h' ? 5000 : 30000, // Faster refresh for shorter periods
   });
 
   const handlePeriodChange = (period: PeriodType, range?: { start: Date; end: Date }) => {

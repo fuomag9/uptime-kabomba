@@ -22,7 +22,7 @@ const STATUS_COLORS = {
 };
 
 export default function MonitorCard({ monitor, latestPing, uptime }: MonitorCardProps) {
-  const [period, setPeriod] = useState<'1h' | '24h' | '7d' | '30d' | '90d'>('7d');
+  const [period, setPeriod] = useState<'1h' | '3h' | '6h' | '24h'>('1h');
 
   // Get real-time heartbeat
   const heartbeat = useMonitorHeartbeat(monitor.id);
@@ -92,7 +92,7 @@ export default function MonitorCard({ monitor, latestPing, uptime }: MonitorCard
           >
             <PeriodSelector
               value={period}
-              onChange={(p) => setPeriod(p as '1h' | '24h' | '7d' | '30d' | '90d')}
+              onChange={(p) => setPeriod(p as '1h' | '3h' | '6h' | '24h')}
               compact
             />
           </div>

@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -317,22 +318,59 @@ func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 		// Set default limit based on period
 		limit := 100
 		if limitStr != "" {
-			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 5000 {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 200000 {
 				limit = l
 			}
-		} else if period != "" {
-			// Default limits based on period
-			switch period {
-			case "1h":
-				limit = 100
-			case "24h":
-				limit = 200
-			case "7d":
-				limit = 500
-			case "30d":
-				limit = 1000
-			case "90d":
-				limit = 2000
+		} else {
+			var intervalSeconds int
+			{
+				var monitor models.Monitor
+				if err := db.Select("interval").Where("id = ?", monitorID).First(&monitor).Error; err == nil {
+					intervalSeconds = monitor.Interval
+				}
+			}
+
+			// Default limits based on period or range and monitor interval
+			if intervalSeconds > 0 {
+				var duration time.Duration
+				if period != "" {
+					switch period {
+					case "1h":
+						duration = time.Hour
+					case "3h":
+						duration = 3 * time.Hour
+					case "6h":
+						duration = 6 * time.Hour
+					case "24h":
+						duration = 24 * time.Hour
+					}
+				} else if startTimeStr != "" && endTimeStr != "" {
+					if startTime, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
+						if endTime, err := time.Parse(time.RFC3339, endTimeStr); err == nil && endTime.After(startTime) {
+							duration = endTime.Sub(startTime)
+						}
+					}
+				}
+
+				if duration > 0 {
+					estimated := int(math.Ceil(duration.Seconds() / float64(intervalSeconds)))
+					estimated = int(float64(estimated) * 1.1) // small buffer for jitter
+					if estimated > limit {
+						limit = estimated
+					}
+				}
+			} else if period != "" {
+				// Fallback limits when interval is unknown
+				switch period {
+				case "1h":
+					limit = 100
+				case "3h":
+					limit = 300
+				case "6h":
+					limit = 600
+				case "24h":
+					limit = 2000
+				}
 			}
 		}
 
@@ -346,14 +384,12 @@ func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 			switch period {
 			case "1h":
 				startTime = endTime.Add(-1 * time.Hour)
+			case "3h":
+				startTime = endTime.Add(-3 * time.Hour)
+			case "6h":
+				startTime = endTime.Add(-6 * time.Hour)
 			case "24h":
 				startTime = endTime.Add(-24 * time.Hour)
-			case "7d":
-				startTime = endTime.Add(-7 * 24 * time.Hour)
-			case "30d":
-				startTime = endTime.Add(-30 * 24 * time.Hour)
-			case "90d":
-				startTime = endTime.Add(-90 * 24 * time.Hour)
 			default:
 				startTime = endTime.Add(-24 * time.Hour) // Default to 24h
 			}
