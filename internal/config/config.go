@@ -131,7 +131,7 @@ func (c *Config) Validate() error {
 		if c.OAuth.ClientID == "" || c.OAuth.ClientSecret == "" {
 			return fmt.Errorf("OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required when OAuth is enabled")
 		}
-		// OAUTH_REDIRECT_URL is derived from APP_URL
+		// OAuth redirect URL is derived from APP_URL
 	}
 
 	return nil
@@ -251,7 +251,7 @@ func loadOAuthConfig() *OAuthConfig {
 	clientSecret := os.Getenv("OAUTH_CLIENT_SECRET")
 	redirectURL := ""
 	if appURL := getAppURL(); appURL != "" {
-		redirectURL = appURL + "/api/auth/oauth/callback"
+		redirectURL = appURL + "/oauth/callback"
 	}
 
 	if clientID == "" || clientSecret == "" {
