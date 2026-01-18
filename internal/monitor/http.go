@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -230,5 +231,65 @@ func (h *HTTPMonitor) getConfigIntSlice(monitor *Monitor, key string, defaultVal
 		}
 		return result
 	}
+	if val, ok := monitor.Config[key].(string); ok {
+		parsed := parseStatusCodeList(val)
+		if len(parsed) > 0 {
+			return parsed
+		}
+	}
 	return defaultValue
+}
+
+func parseStatusCodeList(value string) []int {
+	parts := strings.Split(value, ",")
+	result := make([]int, 0, len(parts))
+	seen := make(map[int]struct{}, 32)
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		if strings.Contains(part, "-") {
+			rangeParts := strings.SplitN(part, "-", 2)
+			if len(rangeParts) != 2 {
+				continue
+			}
+			start, err1 := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
+			end, err2 := strconv.Atoi(strings.TrimSpace(rangeParts[1]))
+			if err1 != nil || err2 != nil {
+				continue
+			}
+			if start > end {
+				start, end = end, start
+			}
+			if start < 100 {
+				start = 100
+			}
+			if end > 599 {
+				end = 599
+			}
+			for code := start; code <= end; code++ {
+				if _, ok := seen[code]; ok {
+					continue
+				}
+				seen[code] = struct{}{}
+				result = append(result, code)
+			}
+			continue
+		}
+
+		code, err := strconv.Atoi(part)
+		if err != nil || code < 100 || code > 599 {
+			continue
+		}
+		if _, ok := seen[code]; ok {
+			continue
+		}
+		seen[code] = struct{}{}
+		result = append(result, code)
+	}
+
+	return result
 }

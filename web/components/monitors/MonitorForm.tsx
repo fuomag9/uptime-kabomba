@@ -69,7 +69,7 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
 
   // Ping config
   const [pingConfig, setPingConfig] = useState({
-    packet_count: (initialData?.config?.packet_count as number) || 4,
+    packet_count: (initialData?.config?.packet_count as number) || 1,
     packet_size: (initialData?.config?.packet_size as number) || 56,
     privileged: (initialData?.config?.privileged as boolean) || false,
   });
@@ -140,7 +140,7 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
     } else if (formData.type === 'tcp') {
       config.port = tcpConfig.port;
     } else if (formData.type === 'ping') {
-      if (pingConfig.packet_count !== 4) {
+      if (pingConfig.packet_count !== 1) {
         config.packet_count = pingConfig.packet_count;
       }
       if (pingConfig.packet_size !== 56) {

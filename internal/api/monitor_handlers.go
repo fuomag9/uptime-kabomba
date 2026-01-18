@@ -42,23 +42,34 @@ func HandleGetMonitors(db *gorm.DB) http.HandlerFunc {
 
 		// AfterFind hook automatically unmarshals Config JSON
 
-		// Fetch last heartbeat for each monitor
 		monitorsWithStatus := make([]MonitorWithStatus, len(monitors))
+		monitorIDs := make([]int, 0, len(monitors))
 		for i, mon := range monitors {
 			monitorsWithStatus[i] = MonitorWithStatus{
 				Monitor: mon,
 			}
+			monitorIDs = append(monitorIDs, mon.ID)
+		}
 
-			var lastHeartbeat models.Heartbeat
-			err := db.Where("monitor_id = ?", mon.ID).
-				Order("time DESC").
-				Limit(1).
-				First(&lastHeartbeat).Error
+		if len(monitorIDs) > 0 {
+			var latest []models.Heartbeat
+			db.Raw(`
+				SELECT DISTINCT ON (monitor_id) *
+				FROM heartbeats
+				WHERE monitor_id IN ?
+				ORDER BY monitor_id, time DESC
+			`, monitorIDs).Scan(&latest)
 
-			if err == nil {
-				monitorsWithStatus[i].LastHeartbeat = &lastHeartbeat
+			latestByMonitor := make(map[int]models.Heartbeat, len(latest))
+			for _, hb := range latest {
+				latestByMonitor[hb.MonitorID] = hb
 			}
-			// Ignore error if no heartbeat exists yet
+
+			for i, mon := range monitors {
+				if hb, ok := latestByMonitor[mon.ID]; ok {
+					monitorsWithStatus[i].LastHeartbeat = &hb
+				}
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")

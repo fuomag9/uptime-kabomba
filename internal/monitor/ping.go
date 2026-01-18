@@ -32,8 +32,8 @@ func (p *PingMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 		return heartbeat, nil
 	}
 
-	// Get packet count from config (default 4)
-	count := 4
+	// Get packet count from config (default 1)
+	count := 1
 	if c, ok := monitor.Config["packet_count"].(float64); ok {
 		count = int(c)
 	}
