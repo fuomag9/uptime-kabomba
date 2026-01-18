@@ -138,6 +138,8 @@ npm start
 | `PORT` | `8080` | Backend internal port (not exposed to host) |
 | `JWT_SECRET` | *required* | Secret key for JWT tokens |
 | `APP_URL` | *(optional)* | Base URL for deriving CORS origins and OAuth redirect |
+| `METRICS_TOKEN` | *required* | Token required to access `/metrics` |
+| `HEALTH_TOKEN` | *required* | Token required to access `/health` |
 
 ### Database Connection Strings
 

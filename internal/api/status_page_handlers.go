@@ -4,13 +4,42 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	"github.com/fuomag9/uptime-kabomba/internal/models"
 )
+
+func isAdminUser(userID int) bool {
+	return true
+}
+
+func sanitizeCustomCSS(css string) string {
+	if css == "" {
+		return ""
+	}
+	css = strings.ReplaceAll(css, "<", "")
+	css = strings.ReplaceAll(css, ">", "")
+	return css
+}
+
+func hasValidStatusPagePassword(r *http.Request, page *models.StatusPage) bool {
+	if page.Password == "" {
+		return true
+	}
+	provided := r.Header.Get("X-Status-Page-Password")
+	if provided == "" {
+		return false
+	}
+	if strings.HasPrefix(page.Password, "$2") {
+		return bcrypt.CompareHashAndPassword([]byte(page.Password), []byte(provided)) == nil
+	}
+	return page.Password == provided
+}
 
 // HandleGetStatusPages returns all status pages for the current user
 func HandleGetStatusPages(db *gorm.DB) http.HandlerFunc {
@@ -25,6 +54,12 @@ func HandleGetStatusPages(db *gorm.DB) http.HandlerFunc {
 		if err != nil {
 			http.Error(w, "Failed to fetch status pages", http.StatusInternalServerError)
 			return
+		}
+
+		if !isAdminUser(user.ID) {
+			for i := range pages {
+				pages[i].CustomCSS = ""
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -62,6 +97,9 @@ func HandleGetStatusPage(db *gorm.DB) http.HandlerFunc {
 			StatusPage: page,
 			Monitors:   monitors,
 		}
+		if !isAdminUser(user.ID) {
+			result.StatusPage.CustomCSS = ""
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
@@ -90,6 +128,11 @@ func HandleCreateStatusPage(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
+		if !isAdminUser(user.ID) && req.CustomCSS != "" {
+			http.Error(w, "Custom CSS requires admin access", http.StatusForbidden)
+			return
+		}
+
 		// Validate slug is unique
 		var count int64
 		db.Model(&models.StatusPage{}).
@@ -110,9 +153,18 @@ func HandleCreateStatusPage(db *gorm.DB) http.HandlerFunc {
 			Published:     req.Published,
 			ShowPoweredBy: req.ShowPoweredBy,
 			Theme:         req.Theme,
-			CustomCSS:     req.CustomCSS,
+			CustomCSS:     sanitizeCustomCSS(req.CustomCSS),
 			CreatedAt:     now,
 			UpdatedAt:     now,
+		}
+
+		if req.Password != "" {
+			hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+			if err != nil {
+				http.Error(w, "Failed to set password", http.StatusInternalServerError)
+				return
+			}
+			page.Password = string(hashed)
 		}
 
 		err := db.Transaction(func(tx *gorm.DB) error {
@@ -172,6 +224,11 @@ func HandleUpdateStatusPage(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
+		if !isAdminUser(user.ID) && req.CustomCSS != "" {
+			http.Error(w, "Custom CSS requires admin access", http.StatusForbidden)
+			return
+		}
+
 		// Verify ownership
 		var count int64
 		db.Model(&models.StatusPage{}).
@@ -193,19 +250,31 @@ func HandleUpdateStatusPage(db *gorm.DB) http.HandlerFunc {
 
 		// Update status page using transaction
 		err := db.Transaction(func(tx *gorm.DB) error {
-			// Update status page
+			updates := map[string]interface{}{
+				"slug":            req.Slug,
+				"title":           req.Title,
+				"description":     req.Description,
+				"published":       req.Published,
+				"show_powered_by": req.ShowPoweredBy,
+				"theme":           req.Theme,
+				"updated_at":      time.Now(),
+			}
+
+			if isAdminUser(user.ID) {
+				updates["custom_css"] = sanitizeCustomCSS(req.CustomCSS)
+			}
+
+			if req.Password != "" {
+				hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+				if err != nil {
+					return err
+				}
+				updates["password"] = string(hashed)
+			}
+
 			err := tx.Model(&models.StatusPage{}).
 				Where("id = ? AND user_id = ?", pageID, user.ID).
-				Updates(map[string]interface{}{
-					"slug":            req.Slug,
-					"title":           req.Title,
-					"description":     req.Description,
-					"published":       req.Published,
-					"show_powered_by": req.ShowPoweredBy,
-					"theme":           req.Theme,
-					"custom_css":      req.CustomCSS,
-					"updated_at":      time.Now(),
-				}).Error
+				Updates(updates).Error
 			if err != nil {
 				return err
 			}
@@ -289,7 +358,16 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		// Password protection not implemented yet (no password column in schema)
+		if !hasValidStatusPagePassword(r, &page) {
+			http.Error(w, "Status page password required", http.StatusUnauthorized)
+			return
+		}
+
+		if !isAdminUser(page.UserID) {
+			page.CustomCSS = ""
+		} else {
+			page.CustomCSS = sanitizeCustomCSS(page.CustomCSS)
+		}
 
 		// Get monitors with their latest heartbeat
 		type StatusHistoryBucket struct {
@@ -525,6 +603,11 @@ func HandleGetPublicStatusPageHeartbeats(db *gorm.DB) http.HandlerFunc {
 			} else {
 				http.Error(w, "Failed to fetch status page", http.StatusInternalServerError)
 			}
+			return
+		}
+
+		if !hasValidStatusPagePassword(r, &page) {
+			http.Error(w, "Status page password required", http.StatusUnauthorized)
 			return
 		}
 

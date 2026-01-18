@@ -35,7 +35,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider --header "X-Health-Token: ${HEALTH_TOKEN}" http://localhost:8080/health || exit 1
 
 # Set environment variables
 ENV DATABASE_TYPE=postgres \
@@ -45,6 +45,8 @@ ENV DATABASE_TYPE=postgres \
     POSTGRES_USER=uptime \
     POSTGRES_PASSWORD=secret \
     POSTGRES_SSLMODE=disable \
+    METRICS_TOKEN=change-me \
+    HEALTH_TOKEN=change-me \
     PORT=8080
 
 # Run the application

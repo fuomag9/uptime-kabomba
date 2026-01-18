@@ -6,12 +6,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 	"nhooyr.io/websocket"
+
+	"github.com/fuomag9/uptime-kabomba/internal/models"
 )
 
 // Message represents a WebSocket message
@@ -37,10 +41,11 @@ type Hub struct {
 	mu            sync.RWMutex
 	jwtSecret     string
 	allowedOrigins []string
+	db            *gorm.DB
 }
 
 // NewHub creates a new Hub
-func NewHub(jwtSecret string, allowedOrigins []string) *Hub {
+func NewHub(jwtSecret string, allowedOrigins []string, db *gorm.DB) *Hub {
 	return &Hub{
 		clients:       make(map[*Client]bool),
 		broadcast:     make(chan []byte, 256),
@@ -48,6 +53,7 @@ func NewHub(jwtSecret string, allowedOrigins []string) *Hub {
 		unregister:    make(chan *Client),
 		jwtSecret:     jwtSecret,
 		allowedOrigins: allowedOrigins,
+		db:            db,
 	}
 }
 
@@ -108,14 +114,28 @@ func (h *Hub) Broadcast(msgType string, payload interface{}) error {
 
 // HandleWebSocket handles WebSocket connections
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	// Authenticate WebSocket connection
-	token := r.URL.Query().Get("token")
-	if token == "" {
-		// Try getting from Authorization header
-		authHeader := r.Header.Get("Authorization")
-		if authHeader != "" {
-			token = strings.TrimPrefix(authHeader, "Bearer ")
+	// Authenticate WebSocket connection (Authorization header or subprotocol)
+	var token string
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		token = strings.TrimPrefix(authHeader, "Bearer ")
+		if token == authHeader {
+			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+			return
 		}
+	} else {
+		subprotocolHeader := r.Header.Get("Sec-WebSocket-Protocol")
+		if subprotocolHeader != "" {
+			parts := strings.Split(subprotocolHeader, ",")
+			if len(parts) > 0 {
+				token = strings.TrimSpace(parts[0])
+			}
+		}
+	}
+
+	if token == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 
 	// Validate JWT token with algorithm check
@@ -143,10 +163,13 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					http.Error(w, "Token expired", http.StatusUnauthorized)
 					return
 				}
+			} else {
+				http.Error(w, "Token has no expiry", http.StatusUnauthorized)
+				return
 			}
 
 			if uid, ok := claims["user_id"].(float64); ok {
-				userID = string(rune(int(uid)))
+				userID = strconv.Itoa(int(uid))
 			}
 		}
 	}
@@ -158,15 +181,37 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ensure user exists and is active
+	userIDInt, err := strconv.Atoi(userID)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var user models.User
+	if err := h.db.Where("id = ?", userIDInt).First(&user).Error; err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !user.Active {
+		http.Error(w, "Account disabled", http.StatusUnauthorized)
+		return
+	}
+
 	// Use configured allowed origins (same as CORS)
 	allowedOrigins := h.allowedOrigins
 	if len(allowedOrigins) == 0 {
 		allowedOrigins = []string{"http://localhost:3000"}
 	}
 
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+	acceptOptions := &websocket.AcceptOptions{
 		OriginPatterns: allowedOrigins,
-	})
+	}
+	if authHeader == "" && token != "" {
+		acceptOptions.Subprotocols = []string{token}
+	}
+
+	conn, err := websocket.Accept(w, r, acceptOptions)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return

@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// Initialize WebSocket hub with allowed origins for security
-	hub := websocket.NewHub(cfg.JWTSecret, cfg.CORSOrigins)
+	hub := websocket.NewHub(cfg.JWTSecret, cfg.CORSOrigins, db)
 	go hub.Run()
 
 	// Initialize notification dispatcher

@@ -137,6 +137,8 @@ POSTGRES_USER=uptime
 POSTGRES_PASSWORD=secret
 POSTGRES_SSLMODE=disable
 APP_URL=http://localhost:3000
+METRICS_TOKEN=change-me
+HEALTH_TOKEN=change-me
 
 # Database Connection Pool
 DB_MAX_OPEN_CONNS=25

@@ -144,8 +144,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 	r.Get("/status/{slug}", HandleGetPublicStatusPage(db))
 	r.Get("/api/status/{slug}/monitors/{id}/heartbeats", HandleGetPublicStatusPageHeartbeats(db))
 
-	// Prometheus metrics endpoint (no auth required)
-	r.Get("/metrics", HandlePrometheusMetrics(db))
+	// Prometheus metrics endpoint (token required)
+	r.Get("/metrics", HandlePrometheusMetrics(db, cfg))
 
 	// Badge endpoints (no auth required)
 	r.Get("/api/badge/{id}/status", HandleStatusBadge(db))
@@ -157,6 +157,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Health-Token") != cfg.HealthToken {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})

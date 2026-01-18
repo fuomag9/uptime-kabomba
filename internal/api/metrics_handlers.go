@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/fuomag9/uptime-kabomba/internal/config"
 	"github.com/fuomag9/uptime-kabomba/internal/models"
 	"github.com/fuomag9/uptime-kabomba/internal/uptime"
 )
@@ -22,8 +23,13 @@ func escapePrometheusLabel(s string) string {
 }
 
 // HandlePrometheusMetrics exports metrics in Prometheus format
-func HandlePrometheusMetrics(db *gorm.DB) http.HandlerFunc {
+func HandlePrometheusMetrics(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Metrics-Token") != cfg.MetricsToken {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		// Set content type for Prometheus
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 

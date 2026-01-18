@@ -28,10 +28,11 @@ export class WebSocketClient {
     if (typeof window === 'undefined') return; // Don't connect on server side
 
     const wsUrl = getWebSocketURL();
-    const url = token ? `${wsUrl}?token=${token}` : wsUrl;
+    const url = wsUrl;
+    const protocols = token ? [token] : undefined;
 
     try {
-      this.ws = new WebSocket(url);
+      this.ws = new WebSocket(url, protocols);
 
       this.ws.onopen = () => {
         console.log('WebSocket connected');

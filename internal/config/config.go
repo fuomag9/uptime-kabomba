@@ -21,6 +21,8 @@ type Config struct {
 	OAuth                  *OAuthConfig
 	AllowPrivateIPs        bool
 	AllowMetadataEndpoints bool
+	MetricsToken           string
+	HealthToken            string
 }
 
 // DatabaseConfig holds database configuration
@@ -61,6 +63,8 @@ func Load() *Config {
 		OAuth:                  oauthConfig,
 		AllowPrivateIPs:        getEnvBool("ALLOW_PRIVATE_IPS", false),
 		AllowMetadataEndpoints: getEnvBool("ALLOW_METADATA_ENDPOINTS", false),
+		MetricsToken:           getEnv("METRICS_TOKEN", ""),
+		HealthToken:            getEnv("HEALTH_TOKEN", ""),
 	}
 
 	// Validate configuration
@@ -121,6 +125,14 @@ func (c *Config) Validate() error {
 
 	if c.Database.Type != "postgres" {
 		return fmt.Errorf("unsupported database type: %s", c.Database.Type)
+	}
+
+	if c.MetricsToken == "" {
+		return fmt.Errorf("METRICS_TOKEN must be set")
+	}
+
+	if c.HealthToken == "" {
+		return fmt.Errorf("HEALTH_TOKEN must be set")
 	}
 
 	// Validate OAuth config if enabled
