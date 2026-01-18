@@ -136,6 +136,7 @@ POSTGRES_DB=uptime
 POSTGRES_USER=uptime
 POSTGRES_PASSWORD=secret
 POSTGRES_SSLMODE=disable
+APP_URL=http://localhost:3000
 
 # Database Connection Pool
 DB_MAX_OPEN_CONNS=25

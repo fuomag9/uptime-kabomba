@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds application configuration
@@ -130,7 +131,7 @@ func (c *Config) Validate() error {
 		if c.OAuth.ClientID == "" || c.OAuth.ClientSecret == "" {
 			return fmt.Errorf("OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required when OAuth is enabled")
 		}
-		// OAUTH_REDIRECT_URL is optional - will be constructed from request if not provided
+		// OAUTH_REDIRECT_URL is derived from APP_URL
 	}
 
 	return nil
@@ -160,17 +161,8 @@ func loadJWTSecret(env string) string {
 }
 
 func loadCORSOrigins(env string) []string {
-	originsEnv := os.Getenv("CORS_ORIGINS")
-
-	if originsEnv != "" {
-		// Parse comma-separated origins
-		origins := []string{}
-		for _, origin := range splitAndTrim(originsEnv, ",") {
-			if origin != "" {
-				origins = append(origins, origin)
-			}
-		}
-		return origins
+	if appURL := getAppURL(); appURL != "" {
+		return []string{appURL}
 	}
 
 	// Default origins based on environment
@@ -179,8 +171,8 @@ func loadCORSOrigins(env string) []string {
 	}
 
 	// In production, require explicit CORS configuration
-	log.Println("WARNING: CORS_ORIGINS not set. Using default localhost origins.")
-	log.Println("WARNING: Set CORS_ORIGINS environment variable for production deployments.")
+	log.Println("WARNING: APP_URL not set. Using default localhost origins.")
+	log.Println("WARNING: Set APP_URL environment variable for production deployments.")
 	return []string{"http://localhost:3000", "http://localhost:8080"}
 }
 
@@ -241,6 +233,14 @@ func generateRandomSecret() string {
 	return base64.URLEncoding.EncodeToString(bytes)
 }
 
+func getAppURL() string {
+	appURL := os.Getenv("APP_URL")
+	if appURL == "" {
+		return ""
+	}
+	return strings.TrimRight(appURL, "/")
+}
+
 func loadOAuthConfig() *OAuthConfig {
 	issuer := os.Getenv("OAUTH_ISSUER")
 	if issuer == "" {
@@ -249,7 +249,10 @@ func loadOAuthConfig() *OAuthConfig {
 
 	clientID := os.Getenv("OAUTH_CLIENT_ID")
 	clientSecret := os.Getenv("OAUTH_CLIENT_SECRET")
-	redirectURL := os.Getenv("OAUTH_REDIRECT_URL")
+	redirectURL := ""
+	if appURL := getAppURL(); appURL != "" {
+		redirectURL = appURL + "/api/auth/oauth/callback"
+	}
 
 	if clientID == "" || clientSecret == "" {
 		log.Println("WARNING: OAUTH_ISSUER is set but OAUTH_CLIENT_ID or OAUTH_CLIENT_SECRET is missing. OAuth will be disabled.")

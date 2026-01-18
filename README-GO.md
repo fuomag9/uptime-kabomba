@@ -61,6 +61,7 @@ POSTGRES_DB=uptime
 POSTGRES_USER=uptime
 POSTGRES_PASSWORD=secret
 POSTGRES_SSLMODE=disable
+APP_URL=http://localhost:3000    # derives CORS + OAuth redirect
 DB_MAX_OPEN_CONNS=25
 DB_MAX_IDLE_CONNS=5
 JWT_SECRET=your-secret-here

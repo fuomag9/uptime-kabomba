@@ -105,6 +105,7 @@ export POSTGRES_DB=uptime
 export POSTGRES_USER=uptime
 export POSTGRES_PASSWORD=secret
 export POSTGRES_SSLMODE=disable
+export APP_URL=http://localhost:3000
 export JWT_SECRET=your-secret-key
 
 # Build and run
@@ -136,6 +137,7 @@ npm start
 | `POSTGRES_SSLMODE` | `disable` | Postgres SSL mode |
 | `PORT` | `8080` | Backend internal port (not exposed to host) |
 | `JWT_SECRET` | *required* | Secret key for JWT tokens |
+| `APP_URL` | *(optional)* | Base URL for deriving CORS origins and OAuth redirect |
 
 ### Database Connection Strings
 
