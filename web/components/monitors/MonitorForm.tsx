@@ -28,6 +28,24 @@ const MONITOR_TYPES = [
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
+function normalizeAcceptedStatusCodes(value: unknown): string {
+  if (Array.isArray(value)) {
+    const codes = value
+      .filter((code) => typeof code === 'number' && Number.isFinite(code))
+      .map((code) => String(code));
+    if (codes.length > 0) {
+      return codes.join(',');
+    }
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+  return '200-299';
+}
+
 export default function MonitorForm({ initialData, monitorId, notificationsConfigured, onSubmit, onCancel, isSubmitting }: MonitorFormProps) {
   const [formData, setFormData] = useState<CreateMonitorRequest>({
     name: initialData?.name || '',
@@ -52,7 +70,7 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
     method: (initialData?.config?.method as string) || 'GET',
     headers: (initialData?.config?.headers as Record<string, string>) || {},
     body: (initialData?.config?.body as string) || '',
-    acceptedStatusCodes: (initialData?.config?.accepted_status_codes as string) || '200-299',
+    acceptedStatusCodes: normalizeAcceptedStatusCodes(initialData?.config?.accepted_status_codes),
     keyword: (initialData?.config?.keyword as string) || '',
     invertKeyword: (initialData?.config?.invert_keyword as boolean) || false,
     ignoreTLS: (initialData?.config?.ignore_tls as boolean) || false,
@@ -124,8 +142,9 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
       if (httpConfig.body) {
         config.body = httpConfig.body;
       }
-      if (httpConfig.acceptedStatusCodes !== '200-299') {
-        config.accepted_status_codes = httpConfig.acceptedStatusCodes;
+      const acceptedStatusCodes = httpConfig.acceptedStatusCodes.trim();
+      if (acceptedStatusCodes.length > 0) {
+        config.accepted_status_codes = acceptedStatusCodes;
       }
       if (httpConfig.keyword) {
         config.keyword = httpConfig.keyword;
