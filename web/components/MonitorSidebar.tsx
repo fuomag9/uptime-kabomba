@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api';
 import { useMonitorHeartbeat } from '@/hooks/useMonitorHeartbeats';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useMemo, useState } from 'react';
 
 const STATUS_COLORS = {
   0: { dot: 'bg-red-500', label: 'Down' },
@@ -55,14 +56,34 @@ export function MonitorSidebar() {
     queryFn: () => apiClient.getMonitors(),
     refetchInterval: 30000,
   });
+  const [query, setQuery] = useState('');
 
-  const sortedMonitors = [...monitors].sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  const sortedMonitors = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const filtered = normalizedQuery.length
+      ? monitors.filter((monitor) =>
+          monitor.name.toLowerCase().includes(normalizedQuery)
+        )
+      : monitors;
+    return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+  }, [monitors, query]);
 
   return (
     <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto">
       <div className="p-4">
+        <div className="mb-4">
+          <label className="sr-only" htmlFor="monitor-search">
+            Search monitors
+          </label>
+          <input
+            id="monitor-search"
+            type="search"
+            placeholder="Search monitors"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+          />
+        </div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Monitors</h2>
           <Link
