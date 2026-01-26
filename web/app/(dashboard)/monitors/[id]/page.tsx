@@ -67,7 +67,8 @@ export default function MonitorDetailPage() {
         period: selectedPeriod as '1h' | '3h' | '6h' | '24h',
       });
     },
-    refetchInterval: selectedPeriod === '1h' || selectedPeriod === '3h' || selectedPeriod === '6h' || selectedPeriod === '24h' ? 5000 : 30000, // Faster refresh for shorter periods
+    // Only auto-refresh for short periods to avoid constant graph recalculation on large time ranges
+    refetchInterval: selectedPeriod === '1h' ? 5000 : false,
   });
 
   const handlePeriodChange = (period: PeriodType, range?: { start: Date; end: Date }) => {
