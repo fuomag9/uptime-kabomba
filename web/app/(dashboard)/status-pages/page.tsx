@@ -96,9 +96,9 @@ export default function StatusPagesPage() {
               key={page.id}
               className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       {page.title}
                     </h3>
@@ -115,9 +115,9 @@ export default function StatusPagesPage() {
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     {page.description || 'No description'}
                   </p>
-                  <div className="mt-2 flex items-center gap-4 text-sm">
+                  <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
                     <span className="text-gray-500 dark:text-gray-400">
-                      Slug: <span className="font-mono text-gray-700 dark:text-gray-300">{page.slug}</span>
+                      Slug: <span className="font-mono text-gray-700 dark:text-gray-300 text-xs break-all">{page.slug}</span>
                     </span>
                     {page.published && (
                       <a
@@ -132,7 +132,7 @@ export default function StatusPagesPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-gray-700 justify-end w-full sm:w-auto">
                   <Link
                     href={`/status-pages/${page.id}/edit`}
                     className="text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"

@@ -19,6 +19,8 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true);
   const { connected } = useWebSocket();
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -67,10 +69,20 @@ export default function DashboardLayout({
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between items-center">
             <div className="flex items-center">
+              <button
+                type="button"
+                className="md:hidden -ml-2 mr-2 p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <span className="sr-only">Open sidebar</span>
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                 Uptime Kabomba 💣
               </h1>
-              <div className="ml-4 flex items-center space-x-2">
+              <div className="ml-4 flex items-center space-x-2 hidden sm:flex">
                 <div className={`h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {connected ? 'Connected' : 'Disconnected'}
@@ -78,45 +90,56 @@ export default function DashboardLayout({
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Link
-                href="/notifications"
-                className={`text-sm font-medium ${
-                  pathname === '/notifications'
-                    ? 'text-primary'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-              >
-                Notifications
-              </Link>
-              <Link
-                href="/status-pages"
-                className={`text-sm font-medium ${
-                  pathname === '/status-pages' || pathname.startsWith('/status-pages/')
-                    ? 'text-primary'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-              >
-                Status Pages
-              </Link>
-              <Link
-                href="/settings"
-                className={`text-sm font-medium ${
-                  pathname === '/settings'
-                    ? 'text-primary'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-              >
-                Settings
-              </Link>
+              <div className="hidden md:flex items-center space-x-4">
+                <Link
+                  href="/notifications"
+                  className={`text-sm font-medium ${pathname === '/notifications'
+                      ? 'text-primary'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
+                >
+                  Notifications
+                </Link>
+                <Link
+                  href="/status-pages"
+                  className={`text-sm font-medium ${pathname === '/status-pages' || pathname.startsWith('/status-pages/')
+                      ? 'text-primary'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
+                >
+                  Status Pages
+                </Link>
+                <Link
+                  href="/settings"
+                  className={`text-sm font-medium ${pathname === '/settings'
+                      ? 'text-primary'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
+                >
+                  Settings
+                </Link>
+              </div>
               <ThemeToggle />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                {user?.username}
-              </span>
+              <div className="hidden md:flex items-center space-x-4">
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  {user?.username}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-md bg-gray-200 dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                >
+                  Logout
+                </button>
+              </div>
+              {/* Mobile Logout (Icon only) */}
               <button
                 onClick={handleLogout}
-                className="rounded-md bg-gray-200 dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                className="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                title="Logout"
               >
-                Logout
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
               </button>
             </div>
           </div>
@@ -126,10 +149,10 @@ export default function DashboardLayout({
       {/* Main Layout with Sidebar */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <MonitorSidebar />
+        <MonitorSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto w-full">
           <div className="px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </div>

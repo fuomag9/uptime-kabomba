@@ -50,13 +50,20 @@ function MonitorSidebarItem({ monitor }: { monitor: any }) {
   );
 }
 
-export function MonitorSidebar() {
+export function MonitorSidebar({
+  isOpen,
+  onClose
+}: {
+  isOpen?: boolean;
+  onClose?: () => void;
+}) {
   const { data: monitors = [], isLoading } = useQuery({
     queryKey: ['monitors'],
     queryFn: () => apiClient.getMonitors(),
     refetchInterval: 30000,
   });
   const [query, setQuery] = useState('');
+  const pathname = usePathname();
 
   const sortedMonitors = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -68,57 +75,129 @@ export function MonitorSidebar() {
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }, [monitors, query]);
 
-  return (
-    <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto">
-      <div className="p-4">
-        <div className="mb-4">
-          <label className="sr-only" htmlFor="monitor-search">
-            Search monitors
-          </label>
-          <input
-            id="monitor-search"
-            type="search"
-            placeholder="Search monitors"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-          />
-        </div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Monitors</h2>
-          <Link
-            href="/monitors/new"
-            className="text-primary hover:text-primary/80"
-            title="Add Monitor"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </Link>
-        </div>
+  // Mobile drawer overlay classes
+  const drawerClasses = isOpen
+    ? 'fixed inset-0 z-50 flex'
+    : 'hidden md:flex md:w-64 md:flex-col';
 
-        {isLoading ? (
-          <div className="text-center py-4">
-            <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-primary border-r-transparent"></div>
+  return (
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-gray-600 bg-opacity-75 md:hidden z-40"
+          onClick={onClose}
+        />
+      )}
+      
+      <div className={`${drawerClasses} md:h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto w-64 flex flex-col`}>
+        {isOpen && (
+           <div className="flex items-center justify-end p-4 md:hidden">
+             <button
+               onClick={onClose}
+               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+             >
+               <span className="sr-only">Close sidebar</span>
+               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+               </svg>
+             </button>
+           </div>
+        )}
+
+        <div className="p-4 flex-1">
+          <div className="mb-4">
+            <label className="sr-only" htmlFor="monitor-search">
+              Search monitors
+            </label>
+            <input
+              id="monitor-search"
+              type="search"
+              placeholder="Search monitors"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+            />
           </div>
-        ) : sortedMonitors.length > 0 ? (
-          <div className="space-y-1">
-            {sortedMonitors.map((monitor) => (
-              <MonitorSidebarItem key={monitor.id} monitor={monitor} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-sm text-gray-500 dark:text-gray-400">No monitors yet</p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Monitors</h2>
             <Link
               href="/monitors/new"
-              className="mt-2 inline-block text-sm text-primary hover:underline"
+              className="text-primary hover:text-primary/80"
+              title="Add Monitor"
+              onClick={onClose}
             >
-              Add your first monitor
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
             </Link>
           </div>
-        )}
+
+          {isLoading ? (
+            <div className="text-center py-4">
+              <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-primary border-r-transparent"></div>
+            </div>
+          ) : sortedMonitors.length > 0 ? (
+            <div className="space-y-1">
+              {sortedMonitors.map((monitor) => (
+                <div key={monitor.id} onClick={onClose}>
+                   <MonitorSidebarItem monitor={monitor} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-500 dark:text-gray-400">No monitors yet</p>
+              <Link
+                href="/monitors/new"
+                className="mt-2 inline-block text-sm text-primary hover:underline"
+                onClick={onClose}
+              >
+                Add your first monitor
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Navigation Links */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 md:hidden">
+          <div className="space-y-1">
+            <Link
+                href="/notifications"
+                onClick={onClose}
+                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                  pathname === '/notifications'
+                    ? 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+                }`}
+            >
+              Notifications
+            </Link>
+            <Link
+                href="/status-pages"
+                onClick={onClose}
+                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                  pathname === '/status-pages'
+                    ? 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+                }`}
+            >
+              Status Pages
+            </Link>
+            <Link
+                href="/settings"
+                onClick={onClose}
+                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                  pathname === '/settings'
+                    ? 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+                }`}
+            >
+              Settings
+            </Link>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

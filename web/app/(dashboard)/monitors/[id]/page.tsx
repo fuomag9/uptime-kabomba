@@ -125,14 +125,14 @@ export default function MonitorDetailPage() {
   // Use real-time heartbeat if available, otherwise use latest from history
   const latestHeartbeat = realtimeHeartbeat
     ? {
-        id: 0,
-        monitor_id: monitorId,
-        status: realtimeHeartbeat.status,
-        ping: realtimeHeartbeat.ping,
-        important: false,
-        message: realtimeHeartbeat.message,
-        time: realtimeHeartbeat.time,
-      }
+      id: 0,
+      monitor_id: monitorId,
+      status: realtimeHeartbeat.status,
+      ping: realtimeHeartbeat.ping,
+      important: false,
+      message: realtimeHeartbeat.message,
+      time: realtimeHeartbeat.time,
+    }
     : (heartbeats && heartbeats.length > 0 ? heartbeats[0] : null);
 
   const statusStyle = latestHeartbeat
@@ -156,7 +156,7 @@ export default function MonitorDetailPage() {
     }
   }
 
-  
+
   return (
     <div>
       {/* Header */}
@@ -188,7 +188,7 @@ export default function MonitorDetailPage() {
             {monitor.type.toUpperCase()} • {monitor.url}
           </p>
         </div>
-        <div className="mt-4 flex gap-2 sm:ml-16 sm:mt-0">
+        <div className="mt-4 flex flex-wrap gap-2 sm:ml-16 sm:mt-0">
           <button
             onClick={() => toggleActiveMutation.mutate()}
             disabled={toggleActiveMutation.isPending}
