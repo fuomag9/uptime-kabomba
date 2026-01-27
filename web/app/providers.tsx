@@ -3,11 +3,18 @@
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { useState } from "react";
-import { ApiError } from "@/lib/api";
+
+function isAuthError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "status" in error &&
+    error.status === 401
+  );
+}
 
 function handleAuthError(error: unknown) {
-  if (typeof window !== "undefined" && (error as ApiError)?.status === 401) {
-    // Redirect to login on auth errors
+  if (typeof window !== "undefined" && isAuthError(error)) {
     window.location.href = "/login";
   }
 }
@@ -22,7 +29,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             refetchOnWindowFocus: false,
             retry: (failureCount, error) => {
               // Don't retry on auth errors
-              if ((error as ApiError)?.status === 401) {
+              if (isAuthError(error)) {
                 return false;
               }
               return failureCount < 3;
