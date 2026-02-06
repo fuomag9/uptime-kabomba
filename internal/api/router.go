@@ -58,15 +58,17 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 	authLimiter.CleanupOldLimiters()
 
 	// Initialize OAuth client if enabled
+	// Discovery is now lazy, so initialization won't fail even if OIDC provider is unreachable
 	var oauthClient *oauth.Client
-	var err error
 	if cfg.OAuth != nil && cfg.OAuth.Enabled {
+		var err error
 		oauthClient, err = oauth.NewClient(cfg.OAuth)
 		if err != nil {
+			// This should only happen if OAuth config is invalid (not provider unreachable)
 			log.Printf("WARNING: Failed to initialize OAuth client: %v", err)
 			log.Println("OAuth authentication will be disabled")
 		} else {
-			log.Println("OAuth client initialized successfully")
+			log.Println("OAuth client initialized (discovery will occur on first use)")
 		}
 	}
 

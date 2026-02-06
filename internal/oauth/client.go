@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fuomag9/uptime-kabomba/internal/config"
@@ -18,9 +20,11 @@ import (
 
 // Client handles OIDC operations
 type Client struct {
-	config     *config.OAuthConfig
-	discovery  *OIDCDiscovery
-	httpClient *http.Client
+	config        *config.OAuthConfig
+	discovery     *OIDCDiscovery
+	httpClient    *http.Client
+	discoveryMu   sync.RWMutex // protects discovery state
+	discoveryDone bool         // whether discovery has been attempted successfully
 }
 
 // OIDCDiscovery holds OIDC provider metadata from .well-known/openid-configuration
@@ -40,7 +44,9 @@ type UserInfo struct {
 	Picture string `json:"picture"`
 }
 
-// NewClient creates a new OAuth client with OIDC discovery
+// NewClient creates a new OAuth client with lazy OIDC discovery
+// Discovery is performed on first use, not at startup, allowing the app
+// to start even if the OIDC provider is temporarily unreachable
 func NewClient(cfg *config.OAuthConfig) (*Client, error) {
 	if cfg == nil || !cfg.Enabled {
 		return nil, fmt.Errorf("OAuth is not enabled")
@@ -53,41 +59,87 @@ func NewClient(cfg *config.OAuthConfig) (*Client, error) {
 		},
 	}
 
-	// Perform OIDC discovery
-	if err := client.discover(); err != nil {
-		return nil, fmt.Errorf("OIDC discovery failed: %w", err)
-	}
-
+	// Discovery is now performed lazily via ensureDiscovered()
 	return client, nil
 }
 
-// discover performs OIDC discovery to find endpoints
+// ensureDiscovered performs OIDC discovery if not already done
+// Uses double-check locking for thread safety and efficiency
+func (c *Client) ensureDiscovered() error {
+	// Fast path: check with read lock
+	c.discoveryMu.RLock()
+	if c.discoveryDone && c.discovery != nil {
+		c.discoveryMu.RUnlock()
+		return nil
+	}
+	c.discoveryMu.RUnlock()
+
+	// Slow path: acquire write lock and check again
+	c.discoveryMu.Lock()
+	defer c.discoveryMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if c.discoveryDone && c.discovery != nil {
+		return nil
+	}
+
+	// Perform discovery
+	err := c.discover()
+	if err == nil {
+		c.discoveryDone = true
+	}
+	return err
+}
+
+// discover performs OIDC discovery to find endpoints with retry logic
 func (c *Client) discover() error {
 	discoveryURL := strings.TrimSuffix(c.config.Issuer, "/") + "/.well-known/openid-configuration"
 
-	resp, err := c.httpClient.Get(discoveryURL)
-	if err != nil {
-		return fmt.Errorf("failed to fetch discovery document: %w", err)
-	}
-	defer resp.Body.Close()
+	// Retry logic: 5 attempts with exponential backoff
+	maxRetries := 5
+	baseDelay := 1 * time.Second
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("discovery endpoint returned status %d: %s", resp.StatusCode, string(body))
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 1s, 2s, 4s, 8s, 16s
+			delay := baseDelay * time.Duration(1<<uint(attempt-1))
+			log.Printf("OAuth OIDC discovery attempt %d/%d failed, retrying in %v: %v", attempt, maxRetries, delay, lastErr)
+			time.Sleep(delay)
+		}
+
+		resp, err := c.httpClient.Get(discoveryURL)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to fetch discovery document: %w", err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			lastErr = fmt.Errorf("discovery endpoint returned status %d: %s", resp.StatusCode, string(body))
+			continue
+		}
+
+		var discovery OIDCDiscovery
+		if err := json.NewDecoder(resp.Body).Decode(&discovery); err != nil {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("failed to decode discovery document: %w", err)
+			continue
+		}
+		resp.Body.Close()
+
+		// Validate required fields
+		if discovery.AuthorizationEndpoint == "" || discovery.TokenEndpoint == "" || discovery.UserinfoEndpoint == "" {
+			lastErr = fmt.Errorf("discovery document missing required endpoints")
+			continue
+		}
+
+		c.discovery = &discovery
+		return nil
 	}
 
-	var discovery OIDCDiscovery
-	if err := json.NewDecoder(resp.Body).Decode(&discovery); err != nil {
-		return fmt.Errorf("failed to decode discovery document: %w", err)
-	}
-
-	// Validate required fields
-	if discovery.AuthorizationEndpoint == "" || discovery.TokenEndpoint == "" || discovery.UserinfoEndpoint == "" {
-		return fmt.Errorf("discovery document missing required endpoints")
-	}
-
-	c.discovery = &discovery
-	return nil
+	return fmt.Errorf("OIDC discovery failed after %d attempts: %w", maxRetries, lastErr)
 }
 
 // GenerateState generates a random state parameter for CSRF protection
@@ -116,7 +168,12 @@ func GenerateCodeChallenge(verifier string) string {
 }
 
 // GetAuthorizationURL returns the OAuth authorization URL with PKCE
-func (c *Client) GetAuthorizationURL(state, codeChallenge, redirectURL string) string {
+// Returns an error if OIDC discovery fails (e.g., provider unreachable)
+func (c *Client) GetAuthorizationURL(state, codeChallenge, redirectURL string) (string, error) {
+	if err := c.ensureDiscovered(); err != nil {
+		return "", fmt.Errorf("OIDC provider unavailable: %w", err)
+	}
+
 	params := url.Values{}
 	params.Set("client_id", c.config.ClientID)
 	params.Set("response_type", "code")
@@ -126,11 +183,15 @@ func (c *Client) GetAuthorizationURL(state, codeChallenge, redirectURL string) s
 	params.Set("code_challenge", codeChallenge)
 	params.Set("code_challenge_method", "S256")
 
-	return c.discovery.AuthorizationEndpoint + "?" + params.Encode()
+	return c.discovery.AuthorizationEndpoint + "?" + params.Encode(), nil
 }
 
 // ExchangeCode exchanges authorization code for access token
 func (c *Client) ExchangeCode(ctx context.Context, code, codeVerifier, redirectURL string) (string, error) {
+	if err := c.ensureDiscovered(); err != nil {
+		return "", fmt.Errorf("OIDC provider unavailable: %w", err)
+	}
+
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("code", code)
@@ -176,6 +237,10 @@ func (c *Client) ExchangeCode(ctx context.Context, code, codeVerifier, redirectU
 
 // GetUserInfo fetches user information from the userinfo endpoint
 func (c *Client) GetUserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {
+	if err := c.ensureDiscovered(); err != nil {
+		return nil, fmt.Errorf("OIDC provider unavailable: %w", err)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", c.discovery.UserinfoEndpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create userinfo request: %w", err)

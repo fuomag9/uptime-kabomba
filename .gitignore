@@ -37,3 +37,4 @@ extra/exe-builder/obj
 /web/build/
 /web/node_modules/
 /bin
+/.playwright-mcp

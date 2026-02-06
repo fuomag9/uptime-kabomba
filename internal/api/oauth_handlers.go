@@ -66,7 +66,14 @@ func HandleOAuthAuthorize(db *gorm.DB, cfg *config.Config, oauthClient *oauth.Cl
 		codeChallenge := oauth.GenerateCodeChallenge(codeVerifier)
 
 		// Redirect to authorization endpoint
-		authURL := oauthClient.GetAuthorizationURL(state, codeChallenge, redirectURL)
+		authURL, err := oauthClient.GetAuthorizationURL(state, codeChallenge, redirectURL)
+		if err != nil {
+			log.Println("OAuth: OIDC provider unavailable:", err)
+			// Clean up the session we just created since we can't proceed
+			db.Delete(&session)
+			http.Error(w, "OAuth provider is temporarily unavailable. Please try again later.", http.StatusServiceUnavailable)
+			return
+		}
 		log.Println("OAuth: Redirecting to authorization URL")
 		http.Redirect(w, r, authURL, http.StatusFound)
 	}
