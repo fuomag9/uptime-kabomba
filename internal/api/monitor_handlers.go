@@ -233,7 +233,12 @@ func HandleUpdateMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc
 			return
 		}
 
-		// BeforeSave hook will automatically marshal Config to ConfigRaw
+		// Manually trigger BeforeSave to marshal Config to ConfigRaw
+		// (Updates() with map doesn't call BeforeSave hook)
+		if err := mon.BeforeSave(db); err != nil {
+			http.Error(w, "Failed to marshal config: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		mon.UpdatedAt = time.Now()
 
 		// Update database
@@ -245,6 +250,8 @@ func HandleUpdateMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc
 				"url":        mon.URL,
 				"interval":   mon.Interval,
 				"timeout":    mon.Timeout,
+			"resend_interval": mon.ResendInterval,
+			"ip_version":      mon.IPVersion,
 				"active":     mon.Active,
 				"config":     mon.ConfigRaw,
 				"updated_at": mon.UpdatedAt,
