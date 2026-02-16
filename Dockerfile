@@ -1,5 +1,5 @@
 # Backend build stage
-FROM golang:1.25-alpine AS backend-builder
+FROM golang:1.26-alpine AS backend-builder
 
 # Install build dependencies
 RUN apk add --no-cache git gcc musl-dev
