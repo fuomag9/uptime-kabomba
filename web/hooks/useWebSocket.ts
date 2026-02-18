@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { wsClient, WebSocketMessage } from '@/lib/websocket';
 import { apiClient } from '@/lib/api';
 
@@ -42,9 +42,17 @@ export function useWebSocketMessage(
   messageType: string,
   handler: (payload: any) => void
 ) {
+  // Store handler in ref to keep subscription stable
+  const handlerRef = useRef(handler);
+
+  // Keep ref updated with latest handler
+  useEffect(() => {
+    handlerRef.current = handler;
+  });
+
   useEffect(() => {
     const wrappedHandler = (message: WebSocketMessage) => {
-      handler(message.payload);
+      handlerRef.current(message.payload);
     };
 
     wsClient.on(messageType, wrappedHandler);
@@ -52,7 +60,7 @@ export function useWebSocketMessage(
     return () => {
       wsClient.off(messageType, wrappedHandler);
     };
-  }, [messageType, handler]);
+  }, [messageType]);
 }
 
 export function useHeartbeat(monitorId: number) {
