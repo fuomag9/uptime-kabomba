@@ -42,6 +42,10 @@ interface ChartDataPoint {
   index: number;
   time: number;
   ping: number;
+  pingUp: number | null;
+  pingDown: number | null;
+  pingPending: number | null;
+  pingMaintenance: number | null;
   status: number;
   message: string;
   timestamp: string;
@@ -69,7 +73,12 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
       <div className="space-y-2 text-sm">
         <div className="flex justify-between gap-4">
           <span className="text-gray-400">Response:</span>
-          <span className="font-mono text-green-400">{data.ping}ms</span>
+          <span
+            className="font-mono"
+            style={{ color: STATUS_COLORS[data.status] ?? '#9ca3af' }}
+          >
+            {data.ping}ms
+          </span>
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-gray-400">Time:</span>
@@ -109,6 +118,10 @@ export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatCh
       index: idx,
       time: new Date(hb.time).getTime(),
       ping: hb.ping,
+      pingUp: hb.status === 1 ? hb.ping : null,
+      pingDown: hb.status === 0 ? hb.ping : null,
+      pingPending: hb.status === 2 ? hb.ping : null,
+      pingMaintenance: hb.status === 3 ? hb.ping : null,
       status: hb.status,
       message: hb.message,
       timestamp: hb.time,
@@ -154,9 +167,21 @@ export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatCh
           margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
         >
           <defs>
-            <linearGradient id="colorPing" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="colorPingUp" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
               <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="colorPingDown" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.35} />
+              <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="colorPingPending" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#eab308" stopOpacity={0.35} />
+              <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="colorPingMaintenance" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid
@@ -191,17 +216,76 @@ export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatCh
           />
           <Area
             type="monotone"
-            dataKey="ping"
+            dataKey="pingDown"
+            stroke="#ef4444"
+            strokeWidth={2}
+            fillOpacity={1}
+            fill="url(#colorPingDown)"
+            connectNulls={false}
+            isAnimationActive={shouldAnimate}
+            animationDuration={shouldAnimate ? 500 : 0}
+            dot={{
+              r: 2,
+              fill: '#ef4444',
+              stroke: '#ef4444',
+            }}
+            activeDot={{
+              r: 6,
+              stroke: '#ef4444',
+              strokeWidth: 2,
+              fill: '#fff',
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="pingUp"
             stroke="#10b981"
             strokeWidth={2}
             fillOpacity={1}
-            fill="url(#colorPing)"
+            fill="url(#colorPingUp)"
+            connectNulls={false}
             isAnimationActive={shouldAnimate}
             animationDuration={shouldAnimate ? 500 : 0}
             dot={false}
             activeDot={{
               r: 6,
               stroke: '#10b981',
+              strokeWidth: 2,
+              fill: '#fff',
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="pingPending"
+            stroke="#eab308"
+            strokeWidth={2}
+            fillOpacity={1}
+            fill="url(#colorPingPending)"
+            connectNulls={false}
+            isAnimationActive={shouldAnimate}
+            animationDuration={shouldAnimate ? 500 : 0}
+            dot={false}
+            activeDot={{
+              r: 6,
+              stroke: '#eab308',
+              strokeWidth: 2,
+              fill: '#fff',
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="pingMaintenance"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            fillOpacity={1}
+            fill="url(#colorPingMaintenance)"
+            connectNulls={false}
+            isAnimationActive={shouldAnimate}
+            animationDuration={shouldAnimate ? 500 : 0}
+            dot={false}
+            activeDot={{
+              r: 6,
+              stroke: '#3b82f6',
               strokeWidth: 2,
               fill: '#fff',
             }}
