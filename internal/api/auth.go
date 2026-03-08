@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"gorm.io/gorm"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 
 	"github.com/fuomag9/uptime-kabomba/internal/config"
 	"github.com/fuomag9/uptime-kabomba/internal/models"
@@ -74,8 +74,8 @@ func HandleLogin(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 
 		// Check 2FA if enabled
 		if user.TotpSecret != nil && *user.TotpSecret != "" {
-		// WARNING: 2FA is not properly implemented - this is bypassed
-		log.Println("WARNING: User has 2FA configured but it is not enforced")
+			// WARNING: 2FA is not properly implemented - this is bypassed
+			log.Println("WARNING: User has 2FA configured but it is not enforced")
 		}
 
 		// Generate JWT
@@ -132,11 +132,10 @@ func HandleSetup(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		}
 
 		// Create user with local provider
-		provider := "local"
 		newUser := models.User{
 			Username:  req.Username,
 			Password:  string(hashedPassword),
-			Provider:  &provider,
+			Provider:  new("local"),
 			Active:    true,
 			CreatedAt: time.Now(),
 		}

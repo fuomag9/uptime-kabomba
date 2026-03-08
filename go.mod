@@ -1,6 +1,6 @@
 module github.com/fuomag9/uptime-kabomba
 
-go 1.24.0
+go 1.26.0
 
 require (
 	github.com/docker/docker v28.5.2+incompatible

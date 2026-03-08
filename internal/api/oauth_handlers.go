@@ -181,15 +181,13 @@ func handleOAuthUser(db *gorm.DB, cfg *config.Config, userInfo *oauth.UserInfo) 
 
 		// Store linking token in database
 		oauthDataJSON, _ := json.Marshal(userInfo)
-		oauthDataStr := string(oauthDataJSON)
-
 		linking := models.OAuthLinkingToken{
 			Token:     linkingToken,
 			UserID:    existingEmailUser.ID,
 			Provider:  provider,
 			Subject:   userInfo.Subject,
 			Email:     userInfo.Email,
-			OAuthData: &oauthDataStr,
+			OAuthData: new(string(oauthDataJSON)),
 			ExpiresAt: time.Now().Add(5 * time.Minute),
 			CreatedAt: time.Now(),
 		}
@@ -215,15 +213,13 @@ func handleOAuthUser(db *gorm.DB, cfg *config.Config, userInfo *oauth.UserInfo) 
 
 	username := generateUsername(userInfo.Email, db)
 	oauthDataJSON, _ := json.Marshal(userInfo)
-	oauthDataStr := string(oauthDataJSON)
-
 	newUser := models.User{
 		Username:  username,
 		Email:     &userInfo.Email,
 		Password:  "oauth-no-password", // Placeholder for OAuth-only users
 		Provider:  &provider,
 		Subject:   &userInfo.Subject,
-		OAuthData: &oauthDataStr,
+		OAuthData: new(string(oauthDataJSON)),
 		Active:    true,
 		CreatedAt: time.Now(),
 	}

@@ -245,16 +245,16 @@ func HandleUpdateMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc
 		err = db.Model(&models.Monitor{}).
 			Where("id = ? AND user_id = ?", mon.ID, user.ID).
 			Updates(map[string]interface{}{
-				"name":       mon.Name,
-				"type":       mon.Type,
-				"url":        mon.URL,
-				"interval":   mon.Interval,
-				"timeout":    mon.Timeout,
-			"resend_interval": mon.ResendInterval,
-			"ip_version":      mon.IPVersion,
-				"active":     mon.Active,
-				"config":     mon.ConfigRaw,
-				"updated_at": mon.UpdatedAt,
+				"name":            mon.Name,
+				"type":            mon.Type,
+				"url":             mon.URL,
+				"interval":        mon.Interval,
+				"timeout":         mon.Timeout,
+				"resend_interval": mon.ResendInterval,
+				"ip_version":      mon.IPVersion,
+				"active":          mon.Active,
+				"config":          mon.ConfigRaw,
+				"updated_at":      mon.UpdatedAt,
 			}).Error
 
 		if err != nil {
@@ -472,8 +472,7 @@ func HandleGetMonitorNotifications(db *gorm.DB) http.HandlerFunc {
 		// Parse config JSON for each notification
 		for i := range notifications {
 			if notifications[i].Config != "" {
-				configMap := make(map[string]interface{})
-				if err := json.Unmarshal([]byte(notifications[i].Config), &configMap); err == nil {
+				if err := json.Unmarshal([]byte(notifications[i].Config), new(make(map[string]interface{}))); err == nil {
 					// Just verify parsing works, frontend will use the string
 				}
 			}
