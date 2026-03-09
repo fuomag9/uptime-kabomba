@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient, Certificate, CreateCertificateRequest, UpdateCertificateRequest } from '@/lib/api';
+import { parseP12, P12ParseError } from '@/lib/parsep12';
 
 export default function CertificatesPage() {
   const router = useRouter();
@@ -18,6 +19,14 @@ export default function CertificatesPage() {
   const [keyPem, setKeyPem] = useState('');
   const [caPem, setCaPem] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Import .p12 state
+  const [showImport, setShowImport] = useState(false);
+  const [importName, setImportName] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPassword, setImportPassword] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -37,12 +46,14 @@ export default function CertificatesPage() {
   function openCreate() {
     setEditing(null);
     setName(''); setCertPem(''); setKeyPem(''); setCaPem('');
+    setShowImport(false);
     setShowForm(true);
   }
 
   function openEdit(cert: Certificate) {
     setEditing(cert);
     setName(cert.name); setCertPem(cert.cert_pem); setKeyPem(''); setCaPem(cert.ca_pem || '');
+    setShowImport(false);
     setShowForm(true);
   }
 
@@ -77,21 +88,131 @@ export default function CertificatesPage() {
     }
   }
 
+  function openImport() {
+    setShowForm(false);
+    setEditing(null);
+    setImportName('');
+    setImportFile(null);
+    setImportPassword('');
+    setImportError(null);
+    setShowImport(true);
+  }
+
+  async function handleImport(e: React.FormEvent) {
+    e.preventDefault();
+    if (!importFile) return;
+    setImporting(true);
+    setImportError(null);
+
+    try {
+      const binary = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsBinaryString(importFile);
+      });
+
+      const parsed = parseP12(binary, importPassword);
+      const req: CreateCertificateRequest = {
+        name: importName || importFile.name.replace(/\.(p12|pfx)$/i, ''),
+        cert_pem: parsed.certPem,
+        key_pem: parsed.keyPem,
+        ca_pem: parsed.caPem,
+      };
+      await apiClient.createCertificate(req);
+      setShowImport(false);
+      await load();
+    } catch (err: any) {
+      if (err instanceof P12ParseError) {
+        setImportError(err.message);
+      } else {
+        alert('Failed to import: ' + (err.message || 'Unknown error'));
+      }
+    } finally {
+      setImporting(false);
+    }
+  }
+
   if (loading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Client Certificates</h1>
-        <button
-          onClick={openCreate}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90"
-        >
-          Add Certificate
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={openImport}
+            className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            Import .p12
+          </button>
+          <button
+            onClick={openCreate}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90"
+          >
+            Add Certificate
+          </button>
+        </div>
       </div>
 
       {error && <p className="mb-4 text-red-500">{error}</p>}
+
+      {showImport && (
+        <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
+          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Import .p12 Certificate</h2>
+          <form onSubmit={handleImport} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+              <input
+                type="text"
+                value={importName}
+                onChange={(e) => setImportName(e.target.value)}
+                placeholder="Leave blank to use filename"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Certificate file (.p12 / .pfx)</label>
+              <input
+                type="file"
+                accept=".p12,.pfx"
+                required
+                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+              <input
+                type="password"
+                value={importPassword}
+                onChange={(e) => setImportPassword(e.target.value)}
+                placeholder="Certificate password"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
+              />
+            </div>
+            {importError && (
+              <p className="text-sm text-red-500">{importError}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={importing}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
+              >
+                {importing ? 'Importing...' : 'Import'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowImport(false)}
+                className="rounded-md bg-gray-200 dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {showForm && (
         <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
