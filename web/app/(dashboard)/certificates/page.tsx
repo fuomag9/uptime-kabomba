@@ -107,9 +107,15 @@ export default function CertificatesPage() {
     try {
       const binary = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
+        reader.onload = () => {
+          const buf = reader.result as ArrayBuffer;
+          const bytes = new Uint8Array(buf);
+          let str = '';
+          for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+          resolve(str);
+        };
         reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsBinaryString(importFile);
+        reader.readAsArrayBuffer(importFile);
       });
 
       const parsed = parseP12(binary, importPassword);
@@ -284,7 +290,7 @@ export default function CertificatesPage() {
         </div>
       )}
 
-      {certs.length === 0 && !showForm ? (
+      {certs.length === 0 && !showForm && !showImport ? (
         <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-12 text-center">
           <p className="text-gray-500 dark:text-gray-400">No certificates yet. Add one to use mTLS with HTTP monitors.</p>
         </div>
