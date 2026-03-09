@@ -46,12 +46,12 @@ export function parseP12(binaryString: string, password: string): ParsedP12 {
   // Fallback: unencrypted keyBag
   let privateKey: forge.pki.PrivateKey | null = null;
   if (keyBagList.length > 0 && keyBagList[0].key) {
-    privateKey = keyBagList[0].key!;
+    privateKey = keyBagList[0].key;
   } else {
     const plainKeyBags = p12.getBags({ bagType: forge.pki.oids.keyBag });
     const plainKeyList = plainKeyBags[forge.pki.oids.keyBag] ?? [];
     if (plainKeyList.length > 0 && plainKeyList[0].key) {
-      privateKey = plainKeyList[0].key!;
+      privateKey = plainKeyList[0].key;
     }
   }
 
@@ -62,7 +62,7 @@ export function parseP12(binaryString: string, password: string): ParsedP12 {
   }
 
   // First cert is the client cert; subsequent certs are CA chain
-  const clientCert = certBagList[0].cert!;
+  const clientCert = certBagList[0].cert;
   const certPem = forge.pki.certificateToPem(clientCert);
   const keyPem = forge.pki.privateKeyToPem(privateKey);
 
