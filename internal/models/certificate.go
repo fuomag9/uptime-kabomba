@@ -11,6 +11,7 @@ type Certificate struct {
 	CertPEM   string    `json:"cert_pem"   gorm:"not null"`
 	KeyPEM    string    `json:"-"          gorm:"not null"`  // never returned by API
 	CAPEM     string    `json:"ca_pem"`
+	User      User      `json:"-"          gorm:"foreignKey:UserID"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
