@@ -648,11 +648,11 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
             </label>
             <select
               id="certificateId"
-              value={httpConfig.certificateId}
-              onChange={(e) => setHttpConfig({ ...httpConfig, certificateId: Number(e.target.value) })}
+              value={httpConfig.certificateId || ''}
+              onChange={(e) => setHttpConfig({ ...httpConfig, certificateId: e.target.value ? Number(e.target.value) : 0 })}
               className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
             >
-              <option value={0}>None</option>
+              <option value="">None</option>
               {certificates.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
