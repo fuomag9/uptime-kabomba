@@ -79,32 +79,34 @@ func (h *HTTPMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 	var tlsCerts []tls.Certificate
 	var rootCAs *x509.CertPool
 
-	if certIDRaw, ok := monitor.Config["certificate_id"]; ok && h.certLoader != nil {
-		certID := 0
-		switch v := certIDRaw.(type) {
-		case float64:
-			certID = int(v)
-		case int:
-			certID = v
-		}
-		if certID > 0 {
-			certRecord, err := h.certLoader.LoadCertificate(ctx, certID, monitor.UserID)
-			if err != nil {
-				heartbeat.Message = fmt.Sprintf("Failed to load certificate: %v", err)
-				return heartbeat, nil
+	if monitor.Config != nil && h.certLoader != nil {
+		if certIDRaw, ok := monitor.Config["certificate_id"]; ok {
+			certID := 0
+			switch v := certIDRaw.(type) {
+			case float64:
+				certID = int(v)
+			case int:
+				certID = v
 			}
-			tlsCert, err := tls.X509KeyPair([]byte(certRecord.CertPEM), []byte(certRecord.KeyPEM))
-			if err != nil {
-				heartbeat.Message = fmt.Sprintf("Invalid certificate: %v", err)
-				return heartbeat, nil
-			}
-			tlsCerts = append(tlsCerts, tlsCert)
-
-			if certRecord.CAPEM != "" {
-				rootCAs = x509.NewCertPool()
-				if !rootCAs.AppendCertsFromPEM([]byte(certRecord.CAPEM)) {
-					heartbeat.Message = "Failed to parse CA certificate"
+			if certID > 0 {
+				certRecord, err := h.certLoader.LoadCertificate(ctx, certID, monitor.UserID)
+				if err != nil {
+					heartbeat.Message = fmt.Sprintf("Failed to load certificate: %v", err)
 					return heartbeat, nil
+				}
+				tlsCert, err := tls.X509KeyPair([]byte(certRecord.CertPEM), []byte(certRecord.KeyPEM))
+				if err != nil {
+					heartbeat.Message = fmt.Sprintf("Invalid certificate: %v", err)
+					return heartbeat, nil
+				}
+				tlsCerts = append(tlsCerts, tlsCert)
+
+				if certRecord.CAPEM != "" {
+					rootCAs = x509.NewCertPool()
+					if !rootCAs.AppendCertsFromPEM([]byte(certRecord.CAPEM)) {
+						heartbeat.Message = "Failed to parse CA certificate"
+						return heartbeat, nil
+					}
 				}
 			}
 		}
