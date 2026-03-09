@@ -55,6 +55,9 @@ func main() {
 	// Initialize notification dispatcher
 	dispatcher := notification.NewDispatcher(db)
 
+	// Register HTTP monitor with mTLS cert loader
+	monitor.RegisterMonitorType(monitor.NewHTTPMonitor(monitor.NewDBCertLoader(db)))
+
 	// Initialize monitor executor
 	executor := monitor.NewExecutor(db, hub, dispatcher)
 	if err := executor.Start(); err != nil {
