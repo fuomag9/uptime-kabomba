@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { CreateMonitorRequest, Notification, apiClient } from '@/lib/api';
+import { CreateMonitorRequest, Notification, Certificate, apiClient } from '@/lib/api';
 
 interface MonitorFormData {
   monitor: CreateMonitorRequest;
@@ -61,6 +61,7 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedNotificationIds, setSelectedNotificationIds] = useState<number[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
   // Default to using defaults for new monitors, for existing monitors check the flag
   const [useDefaultNotifications, setUseDefaultNotifications] = useState<boolean>(
     monitorId ? notificationsConfigured === false : true
@@ -75,6 +76,7 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
     invertKeyword: (initialData?.config?.invert_keyword as boolean) || false,
     ignoreTLS: (initialData?.config?.ignore_tls as boolean) || false,
     maxRedirects: (initialData?.config?.max_redirects as number) || 10,
+    certificateId: (initialData?.config?.certificate_id as number) || 0,
   });
 
   const [headerKey, setHeaderKey] = useState('');
@@ -108,8 +110,12 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
   useEffect(() => {
     async function loadData() {
       try {
-        const notifs = await apiClient.getNotifications();
+        const [notifs, certs] = await Promise.all([
+          apiClient.getNotifications(),
+          apiClient.getCertificates(),
+        ]);
         setNotifications(notifs);
+        setCertificates(certs);
 
         if (monitorId) {
           // Editing existing monitor - load its linked notifications
@@ -155,6 +161,9 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
       }
       if (httpConfig.maxRedirects !== 10) {
         config.max_redirects = httpConfig.maxRedirects;
+      }
+      if (httpConfig.certificateId) {
+        config.certificate_id = httpConfig.certificateId;
       }
     } else if (formData.type === 'tcp') {
       config.port = tcpConfig.port;
@@ -631,6 +640,26 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
                 className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
               />
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="certificateId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Client Certificate (mTLS)
+            </label>
+            <select
+              id="certificateId"
+              value={httpConfig.certificateId}
+              onChange={(e) => setHttpConfig({ ...httpConfig, certificateId: Number(e.target.value) })}
+              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
+            >
+              <option value={0}>None</option>
+              {certificates.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Optional: select a client certificate for mTLS authentication
+            </p>
           </div>
         </div>
       )}

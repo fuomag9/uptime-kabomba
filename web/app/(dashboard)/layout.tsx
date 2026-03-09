@@ -101,6 +101,15 @@ export default function DashboardLayout({
                   Notifications
                 </Link>
                 <Link
+                  href="/certificates"
+                  className={`text-sm font-medium ${pathname === '/certificates'
+                      ? 'text-primary'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
+                >
+                  Certificates
+                </Link>
+                <Link
                   href="/status-pages"
                   className={`text-sm font-medium ${pathname === '/status-pages' || pathname.startsWith('/status-pages/')
                       ? 'text-primary'
