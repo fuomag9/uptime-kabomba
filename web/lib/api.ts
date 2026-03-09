@@ -456,14 +456,14 @@ export interface Certificate {
 
 export interface CreateCertificateRequest {
   name: string;
-  cert_pem: string;
-  key_pem: string;
+  cert_pem?: string;
+  key_pem?: string;
   ca_pem?: string;
 }
 
 export interface UpdateCertificateRequest {
   name: string;
-  cert_pem: string;
+  cert_pem?: string;
   key_pem?: string; // omit to keep existing key
   ca_pem?: string;
 }

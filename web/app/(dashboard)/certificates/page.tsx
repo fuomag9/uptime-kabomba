@@ -237,31 +237,29 @@ export default function CertificatesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Certificate (PEM)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Certificate (PEM, optional for mTLS)</label>
               <textarea
                 value={certPem}
                 onChange={(e) => setCertPem(e.target.value)}
-                required
                 rows={6}
                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-mono text-gray-900 dark:text-white"
-                placeholder="-----BEGIN CERTIFICATE-----"
+                placeholder="-----BEGIN CERTIFICATE----- (optional)"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Private Key (PEM){editing && ' — leave blank to keep existing'}
+                Private Key (PEM, optional for mTLS){editing && ' — leave blank to keep existing'}
               </label>
               <textarea
                 value={keyPem}
                 onChange={(e) => setKeyPem(e.target.value)}
-                required={!editing}
                 rows={6}
                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-mono text-gray-900 dark:text-white"
-                placeholder={editing ? '••••••••' : '-----BEGIN PRIVATE KEY-----'}
+                placeholder={editing ? '••••••••' : '-----BEGIN PRIVATE KEY----- (optional)'}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CA Certificate (PEM, optional)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CA Certificate (PEM) — required for self-signed server certificates</label>
               <textarea
                 value={caPem}
                 onChange={(e) => setCaPem(e.target.value)}

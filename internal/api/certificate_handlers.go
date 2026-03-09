@@ -65,8 +65,16 @@ func HandleCreateCertificate(db *gorm.DB) http.HandlerFunc {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		if req.Name == "" || req.CertPEM == "" || req.KeyPEM == "" {
-			http.Error(w, "name, cert_pem, and key_pem are required", http.StatusBadRequest)
+		if req.Name == "" {
+			http.Error(w, "name is required", http.StatusBadRequest)
+			return
+		}
+		if req.CertPEM == "" && req.KeyPEM == "" && req.CAPEM == "" {
+			http.Error(w, "at least one of cert_pem, key_pem, or ca_pem is required", http.StatusBadRequest)
+			return
+		}
+		if (req.CertPEM == "") != (req.KeyPEM == "") {
+			http.Error(w, "cert_pem and key_pem must both be provided together", http.StatusBadRequest)
 			return
 		}
 
@@ -109,8 +117,8 @@ func HandleUpdateCertificate(db *gorm.DB) http.HandlerFunc {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-		if req.Name == "" || req.CertPEM == "" {
-			http.Error(w, "name and cert_pem are required", http.StatusBadRequest)
+		if req.Name == "" {
+			http.Error(w, "name is required", http.StatusBadRequest)
 			return
 		}
 
