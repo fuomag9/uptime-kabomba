@@ -161,11 +161,14 @@ func HandleDeleteCertificate(db *gorm.DB) http.HandlerFunc {
 		// Check if any monitor references this certificate
 		var count int64
 		// Config is stored as JSONB; use an exact integer match to avoid false positives
-		db.Raw(
+		if err := db.Raw(
 			`SELECT COUNT(*) FROM monitors WHERE user_id = ? AND (config::jsonb->>'certificate_id')::int = ?`,
 			user.ID,
 			id,
-		).Scan(&count)
+		).Scan(&count).Error; err != nil {
+			http.Error(w, "Failed to check certificate usage", http.StatusInternalServerError)
+			return
+		}
 		if count > 0 {
 			http.Error(w, "Certificate is in use by one or more monitors", http.StatusConflict)
 			return
