@@ -378,6 +378,36 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Certificate endpoints
+  async getCertificates(): Promise<Certificate[]> {
+    const result = await this.request<Certificate[] | null>('/api/certificates');
+    return result || [];
+  }
+
+  async getCertificate(id: number): Promise<Certificate> {
+    return this.request<Certificate>(`/api/certificates/${id}`);
+  }
+
+  async createCertificate(data: CreateCertificateRequest): Promise<Certificate> {
+    return this.request<Certificate>('/api/certificates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCertificate(id: number, data: UpdateCertificateRequest): Promise<Certificate> {
+    return this.request<Certificate>(`/api/certificates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCertificate(id: number): Promise<void> {
+    return this.request<void>(`/api/certificates/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 // Monitor types
@@ -411,6 +441,31 @@ export interface CreateMonitorRequest {
 
 export interface UpdateMonitorRequest extends CreateMonitorRequest {
   active?: boolean;
+}
+
+export interface Certificate {
+  id: number;
+  user_id: number;
+  name: string;
+  cert_pem: string;
+  ca_pem: string;
+  created_at: string;
+  updated_at: string;
+  // key_pem is intentionally absent — never returned by the API
+}
+
+export interface CreateCertificateRequest {
+  name: string;
+  cert_pem: string;
+  key_pem: string;
+  ca_pem?: string;
+}
+
+export interface UpdateCertificateRequest {
+  name: string;
+  cert_pem: string;
+  key_pem?: string; // omit to keep existing key
+  ca_pem?: string;
 }
 
 export interface MonitorNotificationLink {
