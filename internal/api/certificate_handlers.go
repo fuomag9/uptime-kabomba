@@ -109,7 +109,13 @@ func HandleUpdateCertificate(db *gorm.DB) http.HandlerFunc {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
+		if req.Name == "" || req.CertPEM == "" {
+			http.Error(w, "name and cert_pem are required", http.StatusBadRequest)
+			return
+		}
 
+		// Note: ca_pem is always updated (send "" to clear it).
+		// key_pem is only updated if a new value is provided (cannot be retrieved from the API).
 		updates := map[string]interface{}{
 			"name":       req.Name,
 			"cert_pem":   req.CertPEM,
@@ -134,7 +140,10 @@ func HandleUpdateCertificate(db *gorm.DB) http.HandlerFunc {
 		}
 
 		var cert models.Certificate
-		db.Where("id = ?", id).First(&cert)
+		if err := db.Where("id = ? AND user_id = ?", id, user.ID).First(&cert).Error; err != nil {
+			http.Error(w, "Failed to fetch updated certificate", http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(cert)
 	}
@@ -151,11 +160,11 @@ func HandleDeleteCertificate(db *gorm.DB) http.HandlerFunc {
 
 		// Check if any monitor references this certificate
 		var count int64
-		// Config is stored as JSON text; search for the certificate_id value
+		// Config is stored as JSONB; use an exact integer match to avoid false positives
 		db.Raw(
-			`SELECT COUNT(*) FROM monitors WHERE user_id = ? AND config::text LIKE ?`,
+			`SELECT COUNT(*) FROM monitors WHERE user_id = ? AND (config::jsonb->>'certificate_id')::int = ?`,
 			user.ID,
-			`%"certificate_id":`+strconv.Itoa(id)+`%`,
+			id,
 		).Scan(&count)
 		if count > 0 {
 			http.Error(w, "Certificate is in use by one or more monitors", http.StatusConflict)
