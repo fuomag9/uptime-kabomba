@@ -139,6 +139,13 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 			r.Get("/api-keys", HandleGetAPIKeys(db))
 			r.Post("/api-keys", HandleCreateAPIKey(db))
 			r.Delete("/api-keys/{id}", HandleDeleteAPIKey(db))
+
+			// Certificate routes
+			r.Get("/certificates", HandleGetCertificates(db))
+			r.Post("/certificates", HandleCreateCertificate(db))
+			r.Get("/certificates/{id}", HandleGetCertificate(db))
+			r.Put("/certificates/{id}", HandleUpdateCertificate(db))
+			r.Delete("/certificates/{id}", HandleDeleteCertificate(db))
 		})
 	})
 
