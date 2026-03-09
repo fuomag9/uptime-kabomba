@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
@@ -12,11 +13,15 @@ import (
 	"time"
 )
 
-// HTTPMonitor implements HTTP/HTTPS monitoring
-type HTTPMonitor struct{}
+// HTTPMonitor implements HTTP/HTTPS monitoring.
+// certLoader may be nil; if nil, mTLS is unavailable.
+type HTTPMonitor struct {
+	certLoader CertLoader
+}
 
-func init() {
-	RegisterMonitorType(&HTTPMonitor{})
+// NewHTTPMonitor creates an HTTPMonitor with the given CertLoader.
+func NewHTTPMonitor(loader CertLoader) *HTTPMonitor {
+	return &HTTPMonitor{certLoader: loader}
 }
 
 // Name returns the monitor type name
@@ -70,6 +75,41 @@ func (h *HTTPMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 	ignoreTLS := h.getConfigBool(monitor, "ignore_tls", false)
 	followRedirects := h.getConfigBool(monitor, "follow_redirects", true)
 
+	// Load client certificate if configured
+	var tlsCerts []tls.Certificate
+	var rootCAs *x509.CertPool
+
+	if certIDRaw, ok := monitor.Config["certificate_id"]; ok && h.certLoader != nil {
+		certID := 0
+		switch v := certIDRaw.(type) {
+		case float64:
+			certID = int(v)
+		case int:
+			certID = v
+		}
+		if certID > 0 {
+			certRecord, err := h.certLoader.LoadCertificate(ctx, certID, monitor.UserID)
+			if err != nil {
+				heartbeat.Message = fmt.Sprintf("Failed to load certificate: %v", err)
+				return heartbeat, nil
+			}
+			tlsCert, err := tls.X509KeyPair([]byte(certRecord.CertPEM), []byte(certRecord.KeyPEM))
+			if err != nil {
+				heartbeat.Message = fmt.Sprintf("Invalid certificate: %v", err)
+				return heartbeat, nil
+			}
+			tlsCerts = append(tlsCerts, tlsCert)
+
+			if certRecord.CAPEM != "" {
+				rootCAs = x509.NewCertPool()
+				if !rootCAs.AppendCertsFromPEM([]byte(certRecord.CAPEM)) {
+					heartbeat.Message = "Failed to parse CA certificate"
+					return heartbeat, nil
+				}
+			}
+		}
+	}
+
 	// Create HTTP client with IP version support
 	client := &http.Client{
 		Timeout: time.Duration(monitor.Timeout) * time.Second,
@@ -84,6 +124,8 @@ func (h *HTTPMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 			},
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: ignoreTLS,
+				Certificates:       tlsCerts,
+				RootCAs:            rootCAs,
 			},
 		},
 	}

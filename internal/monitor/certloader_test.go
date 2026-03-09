@@ -13,6 +13,14 @@ func TestDBCertLoaderImplementsCertLoader(t *testing.T) {
 	var _ CertLoader = (*DBCertLoader)(nil)
 }
 
+// Verify that a nil CertLoader is valid to store in HTTPMonitor.
+func TestHTTPMonitorAcceptsNilCertLoader(t *testing.T) {
+	m := NewHTTPMonitor(nil)
+	if m == nil {
+		t.Fatal("NewHTTPMonitor returned nil")
+	}
+}
+
 // Ensure Certificate model has the fields we depend on.
 func TestCertificateModelFields(t *testing.T) {
 	cert := models.Certificate{
