@@ -19,6 +19,8 @@ type DBCertLoader struct {
 	db *gorm.DB
 }
 
+var _ CertLoader = (*DBCertLoader)(nil)
+
 // NewDBCertLoader creates a new DBCertLoader.
 func NewDBCertLoader(db *gorm.DB) *DBCertLoader {
 	return &DBCertLoader{db: db}
@@ -32,7 +34,7 @@ func (l *DBCertLoader) LoadCertificate(ctx context.Context, certID int, userID i
 		Where("id = ? AND user_id = ?", certID, userID).
 		First(&cert).Error
 	if err != nil {
-		return nil, fmt.Errorf("certificate %d not found for user %d: %w", certID, userID, err)
+		return nil, fmt.Errorf("certificate %d not found: %w", certID, err)
 	}
 	return &cert, nil
 }
