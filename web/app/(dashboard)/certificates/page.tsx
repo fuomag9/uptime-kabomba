@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient, Certificate, CreateCertificateRequest, UpdateCertificateRequest } from '@/lib/api';
 
@@ -19,11 +19,10 @@ export default function CertificatesPage() {
   const [caPem, setCaPem] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { load(); }, []);
-
-  async function load() {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       setCerts(await apiClient.getCertificates());
     } catch (err: any) {
       setError(err.message || 'Failed to load certificates');
@@ -31,7 +30,9 @@ export default function CertificatesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [router]);
+
+  useEffect(() => { load(); }, [load]);
 
   function openCreate() {
     setEditing(null);
