@@ -94,18 +94,13 @@ func (h *HTTPMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 					heartbeat.Message = fmt.Sprintf("Failed to load certificate: %v", err)
 					return heartbeat, nil
 				}
-
-				// Load client cert only when both halves are present
-				if certRecord.CertPEM != "" && certRecord.KeyPEM != "" {
-					tlsCert, err := tls.X509KeyPair([]byte(certRecord.CertPEM), []byte(certRecord.KeyPEM))
-					if err != nil {
-						heartbeat.Message = fmt.Sprintf("Invalid certificate: %v", err)
-						return heartbeat, nil
-					}
-					tlsCerts = append(tlsCerts, tlsCert)
+				tlsCert, err := tls.X509KeyPair([]byte(certRecord.CertPEM), []byte(certRecord.KeyPEM))
+				if err != nil {
+					heartbeat.Message = fmt.Sprintf("Invalid certificate: %v", err)
+					return heartbeat, nil
 				}
+				tlsCerts = append(tlsCerts, tlsCert)
 
-				// Load CA cert for server verification (works even without a client cert)
 				if certRecord.CAPEM != "" {
 					rootCAs = x509.NewCertPool()
 					if !rootCAs.AppendCertsFromPEM([]byte(certRecord.CAPEM)) {
