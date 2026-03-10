@@ -102,11 +102,15 @@ func (h *HTTPMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 				tlsCerts = append(tlsCerts, tlsCert)
 
 				if certRecord.CAPEM != "" {
-					rootCAs = x509.NewCertPool()
-					if !rootCAs.AppendCertsFromPEM([]byte(certRecord.CAPEM)) {
+					pool, err := x509.SystemCertPool()
+					if err != nil {
+						pool = x509.NewCertPool()
+					}
+					if !pool.AppendCertsFromPEM([]byte(certRecord.CAPEM)) {
 						heartbeat.Message = "Failed to parse CA certificate"
 						return heartbeat, nil
 					}
+					rootCAs = pool
 				}
 			}
 		}
