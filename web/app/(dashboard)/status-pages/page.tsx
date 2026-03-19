@@ -4,12 +4,29 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient, StatusPage } from '@/lib/api';
 import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 export default function StatusPagesPage() {
   const router = useRouter();
   const [statusPages, setStatusPages] = useState<StatusPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     loadStatusPages();
@@ -33,32 +50,50 @@ export default function StatusPagesPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Are you sure you want to delete this status page?')) {
-      return;
-    }
-
     try {
       await apiClient.deleteStatusPage(id);
       setStatusPages((statusPages || []).filter((p) => p.id !== id));
     } catch (err: any) {
       console.error('Failed to delete status page:', err);
-      alert('Failed to delete status page: ' + (err.message || 'Unknown error'));
+      toast.error('Failed to delete status page: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  function handleDeleteRequest(id: number) {
+    setDeleteId(id);
+  }
+
+  function handleDeleteConfirm() {
+    if (deleteId !== null) {
+      handleDelete(deleteId);
+      setDeleteId(null);
     }
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Loading status pages...</div>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <Skeleton className="h-8 w-40" />
+            <Skeleton className="mt-2 h-4 w-64" />
+          </div>
+          <Skeleton className="h-8 w-40" />
+        </div>
+        <div className="grid gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full" />
+          ))}
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
-        {error}
-      </div>
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
     );
   }
 
@@ -66,91 +101,107 @@ export default function StatusPagesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Status Pages</h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <h1 className="text-2xl font-bold">Status Pages</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Create public status pages for your monitors
           </p>
         </div>
-        <Link
-          href="/status-pages/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          Create Status Page
-        </Link>
+        <Button asChild>
+          <Link href="/status-pages/new">
+            Create Status Page
+          </Link>
+        </Button>
       </div>
 
       {(!statusPages || statusPages.length === 0) ? (
-        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
-          <p className="text-gray-600 dark:text-gray-400">No status pages created yet.</p>
-          <Link
-            href="/status-pages/new"
-            className="mt-4 inline-block text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
-          >
-            Create your first status page
-          </Link>
-        </div>
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-muted-foreground">No status pages created yet.</p>
+            <Button variant="link" className="mt-4" asChild>
+              <Link href="/status-pages/new">
+                Create your first status page
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4">
           {(statusPages || []).map((page) => (
-            <div
-              key={page.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {page.title}
-                    </h3>
-                    {page.published ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
-                        Published
+            <Card key={page.id}>
+              <CardContent>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                      <h3 className="text-lg font-semibold">
+                        {page.title}
+                      </h3>
+                      {page.published ? (
+                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                          Published
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">
+                          Draft
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {page.description || 'No description'}
+                    </p>
+                    <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
+                      <span className="text-muted-foreground">
+                        Slug: <span className="font-mono text-foreground text-xs break-all">{page.slug}</span>
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
-                        Draft
-                      </span>
-                    )}
+                      {page.published && (
+                        <a
+                          href={`/status/${page.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          View public page &rarr;
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    {page.description || 'No description'}
-                  </p>
-                  <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      Slug: <span className="font-mono text-gray-700 dark:text-gray-300 text-xs break-all">{page.slug}</span>
-                    </span>
-                    {page.published && (
-                      <a
-                        href={`/status/${page.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-                      >
-                        View public page →
-                      </a>
-                    )}
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-gray-700 justify-end w-full sm:w-auto">
-                  <Link
-                    href={`/status-pages/${page.id}/edit`}
-                    className="text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(page.id)}
-                    className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 px-3 py-1 text-sm font-medium rounded border border-red-600 dark:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  >
-                    Delete
-                  </button>
+                  <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-border justify-end w-full sm:w-auto">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/status-pages/${page.id}/edit`}>
+                        Edit
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteRequest(page.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
+
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this status page? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

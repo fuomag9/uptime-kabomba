@@ -5,6 +5,17 @@ import { useParams } from 'next/navigation';
 import { apiClient, MonitorWithStatus, PublicStatusPage, Heartbeat } from '@/lib/api';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import HeartbeatChart from '@/components/monitors/HeartbeatChart';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function PublicStatusPageComponent() {
   const params = useParams();
@@ -103,36 +114,49 @@ export default function PublicStatusPageComponent() {
     return `${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   }
 
+  function handleMonitorClick(monitor: MonitorWithStatus) {
+    setSelectedMonitor(monitor);
+    if (!chartHeartbeats[monitor.id]) {
+      setLoadingChart(true);
+      apiClient.getPublicStatusPageHeartbeats(slug, monitor.id, { period: '1h' })
+        .then((heartbeats) => {
+          setChartHeartbeats((prev) => ({ ...prev, [monitor.id]: heartbeats }));
+        })
+        .catch((err: any) => {
+          console.error('Failed to load public heartbeats:', err);
+        })
+        .finally(() => setLoadingChart(false));
+    }
+  }
+
   if (showPasswordPrompt) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white shadow rounded-lg p-8 max-w-md w-full">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Password Required</h2>
-          <p className="text-gray-600 mb-6">This status page is password protected.</p>
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            {error && error !== 'This status page is password protected' && (
-              <div className="text-red-600 text-sm">{error}</div>
-            )}
-            <button
-              type="submit"
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Access Status Page
-            </button>
-          </form>
-        </div>
+        <Card className="max-w-md w-full mx-4">
+          <CardContent className="p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Password Required</h2>
+            <p className="text-gray-600 mb-6">This status page is password protected.</p>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              {error && error !== 'This status page is password protected' && (
+                <div className="text-red-600 text-sm">{error}</div>
+              )}
+              <Button type="submit" className="w-full">
+                Access Status Page
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -140,9 +164,11 @@ export default function PublicStatusPageComponent() {
   if (error && !loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error || 'Status page not found'}
-        </div>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4 text-red-700">
+            {error || 'Status page not found'}
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -157,10 +183,15 @@ export default function PublicStatusPageComponent() {
   const overallStatus = data ? getOverallStatus() : { text: 'Loading status', color: mutedTextClass };
   const showSkeleton = loading && !data;
 
+  // NOTE: This page uses custom CSS injection for status page theming.
+  // The dangerouslySetInnerHTML usage is intentional and matches the original implementation
+  // for admin-controlled custom CSS on status pages.
+  const customCssContent = data?.page.custom_css || '';
+
   return (
     <div className={`min-h-screen ${bgClass} ${textClass}`}>
       {data?.page.custom_css && (
-        <style dangerouslySetInnerHTML={{ __html: data.page.custom_css || '' }} />
+        <style dangerouslySetInnerHTML={{ __html: customCssContent }} />
       )}
 
       <div className="absolute top-4 right-4 z-10">
@@ -168,13 +199,12 @@ export default function PublicStatusPageComponent() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="text-center mb-12">
           {showSkeleton ? (
-            <div className="flex flex-col items-center gap-3 animate-pulse">
-              <div className={`h-10 w-64 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
-              <div className={`h-4 w-80 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
-              <div className={`h-6 w-48 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+            <div className="flex flex-col items-center gap-3">
+              <Skeleton className={`h-10 w-64 ${isDark ? 'bg-gray-700' : ''}`} />
+              <Skeleton className={`h-4 w-80 ${isDark ? 'bg-gray-700' : ''}`} />
+              <Skeleton className={`h-6 w-48 ${isDark ? 'bg-gray-700' : ''}`} />
             </div>
           ) : (
             <>
@@ -189,7 +219,6 @@ export default function PublicStatusPageComponent() {
           )}
         </div>
 
-        {/* Incidents */}
         {data?.incidents && data.incidents.length > 0 && (
           <div className="mb-8 space-y-4">
             <h2 className="text-xl font-semibold mb-4">Incidents</h2>
@@ -207,9 +236,9 @@ export default function PublicStatusPageComponent() {
                     </p>
                   </div>
                   {incident.pin && (
-                    <span className="ml-4 text-xs font-medium px-2 py-1 rounded bg-white bg-opacity-50">
+                    <Badge variant="secondary" className="ml-4">
                       Pinned
-                    </span>
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -217,7 +246,6 @@ export default function PublicStatusPageComponent() {
           </div>
         )}
 
-        {/* Monitors */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold mb-4">Services</h2>
           {showSkeleton ? (
@@ -225,22 +253,22 @@ export default function PublicStatusPageComponent() {
               {Array.from({ length: 3 }).map((_, index) => (
                 <div
                   key={`skeleton-${index}`}
-                  className={`${cardBgClass} border ${borderClass} rounded-lg p-4 animate-pulse`}
+                  className={`${cardBgClass} border ${borderClass} rounded-lg p-4`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1">
-                      <div className={`w-3 h-3 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <Skeleton className={`w-3 h-3 rounded-full ${isDark ? 'bg-gray-700' : ''}`} />
                       <div>
-                        <div className={`h-4 w-40 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                        <div className={`mt-2 h-3 w-24 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                        <Skeleton className={`h-4 w-40 ${isDark ? 'bg-gray-700' : ''}`} />
+                        <Skeleton className={`mt-2 h-3 w-24 ${isDark ? 'bg-gray-700' : ''}`} />
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`h-4 w-24 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                      <div className={`mt-2 h-3 w-12 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <Skeleton className={`h-4 w-24 ${isDark ? 'bg-gray-700' : ''}`} />
+                      <Skeleton className={`mt-2 h-3 w-12 ${isDark ? 'bg-gray-700' : ''}`} />
                     </div>
                   </div>
-                  <div className={`mt-4 h-10 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                  <Skeleton className={`mt-4 h-10 ${isDark ? 'bg-gray-700' : ''}`} />
                 </div>
               ))}
             </div>
@@ -287,35 +315,11 @@ export default function PublicStatusPageComponent() {
                       <div
                         role="button"
                         tabIndex={0}
-                        onClick={() => {
-                          setSelectedMonitor(monitor);
-                          if (!chartHeartbeats[monitor.id]) {
-                            setLoadingChart(true);
-                            apiClient.getPublicStatusPageHeartbeats(slug, monitor.id, { period: '1h' })
-                              .then((heartbeats) => {
-                                setChartHeartbeats((prev) => ({ ...prev, [monitor.id]: heartbeats }));
-                              })
-                              .catch((err: any) => {
-                                console.error('Failed to load public heartbeats:', err);
-                              })
-                              .finally(() => setLoadingChart(false));
-                          }
-                        }}
+                        onClick={() => handleMonitorClick(monitor)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            setSelectedMonitor(monitor);
-                            if (!chartHeartbeats[monitor.id]) {
-                              setLoadingChart(true);
-                              apiClient.getPublicStatusPageHeartbeats(slug, monitor.id, { period: '1h' })
-                                .then((heartbeats) => {
-                                  setChartHeartbeats((prev) => ({ ...prev, [monitor.id]: heartbeats }));
-                                })
-                                .catch((err: any) => {
-                                  console.error('Failed to load public heartbeats:', err);
-                                })
-                                .finally(() => setLoadingChart(false));
-                            }
+                            handleMonitorClick(monitor);
                           }
                         }}
                         className={`cursor-pointer rounded-md ${isDark ? 'bg-gray-900/40' : 'bg-gray-100'} p-2`}
@@ -341,10 +345,9 @@ export default function PublicStatusPageComponent() {
           )}
         </div>
 
-        {/* Footer */}
         {data?.page.show_powered_by && (
           <div className={`mt-12 text-center text-sm ${mutedTextClass}`}>
-            Powered by <a href="https://github.com/fuomag9/uptime-kabomba" className="underline hover:no-underline">Uptime Kabomba 💣</a>
+            Powered by <a href="https://github.com/fuomag9/uptime-kabomba" className="underline hover:no-underline">Uptime Kabomba</a>
           </div>
         )}
 
@@ -355,43 +358,29 @@ export default function PublicStatusPageComponent() {
         )}
       </div>
 
-      {selectedMonitor && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setSelectedMonitor(null)}
-        >
-          <div
-            className={`${cardBgClass} ${borderClass} border rounded-xl shadow-2xl w-full max-w-3xl mx-4 p-6`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className={`text-lg font-semibold ${textClass}`}>{selectedMonitor.name}</h3>
-                <p className={`text-sm ${mutedTextClass}`}>Status timeline (last hour)</p>
-              </div>
-              <button
-                onClick={() => setSelectedMonitor(null)}
-                className={`text-sm px-3 py-1 rounded-md border ${borderClass} ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
-              >
-                Close
-              </button>
-            </div>
+      <Dialog open={selectedMonitor !== null} onOpenChange={(open) => { if (!open) setSelectedMonitor(null); }}>
+        <DialogContent className={`sm:max-w-3xl ${cardBgClass} ${borderClass}`}>
+          <DialogHeader>
+            <DialogTitle className={textClass}>{selectedMonitor?.name}</DialogTitle>
+            <p className={`text-sm ${mutedTextClass}`}>Status timeline (last hour)</p>
+          </DialogHeader>
 
-            <div className="mt-6">
-              {loadingChart ? (
-                <div className={`flex items-center justify-center h-[240px] ${isDark ? 'bg-gray-900/40' : 'bg-gray-100'} rounded-lg`}>
-                  <span className={mutedTextClass}>Loading chart...</span>
-                </div>
-              ) : (
+          <div className="mt-2">
+            {loadingChart ? (
+              <div className={`flex items-center justify-center h-[240px] ${isDark ? 'bg-gray-900/40' : 'bg-gray-100'} rounded-lg`}>
+                <span className={mutedTextClass}>Loading chart...</span>
+              </div>
+            ) : (
+              selectedMonitor && (
                 <HeartbeatChart
                   heartbeats={(chartHeartbeats[selectedMonitor.id] || []) as any}
                   height={240}
                 />
-              )}
-            </div>
+              )
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

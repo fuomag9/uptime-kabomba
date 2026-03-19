@@ -2,6 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { CreateMonitorRequest, Notification, Certificate, apiClient } from '@/lib/api';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 interface MonitorFormData {
   monitor: CreateMonitorRequest;
@@ -223,31 +230,30 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
       <div className="space-y-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">Basic Information</h3>
 
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="space-y-2">
+          <Label htmlFor="name">
             Monitor Name
-          </label>
-          <input
+          </Label>
+          <Input
             type="text"
             id="name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
             placeholder="My Website"
           />
         </div>
 
-        <div>
-          <label htmlFor="type" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="space-y-2">
+          <Label htmlFor="type">
             Monitor Type
-          </label>
+          </Label>
           <select
             id="type"
             value={formData.type}
             onChange={(e) => setFormData({ ...formData, type: e.target.value })}
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
+            className="flex h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30"
           >
             {MONITOR_TYPES.map((type) => (
               <option key={type.value} value={type.value}>
@@ -257,95 +263,92 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
           </select>
         </div>
 
-        <div>
-          <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="space-y-2">
+          <Label htmlFor="url">
             {MONITOR_TYPES.find(t => t.value === formData.type)?.urlLabel || 'URL'}
-          </label>
-          <input
+          </Label>
+          <Input
             type="text"
             id="url"
             value={formData.url}
             onChange={(e) => setFormData({ ...formData, url: e.target.value })}
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
             placeholder={MONITOR_TYPES.find(t => t.value === formData.type)?.urlPlaceholder || 'Enter URL'}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="interval" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="space-y-2">
+            <Label htmlFor="interval">
               Check Interval (seconds)
-            </label>
-            <input
+            </Label>
+            <Input
               type="number"
               id="interval"
               value={formData.interval}
               onChange={(e) => setFormData({ ...formData, interval: parseInt(e.target.value) })}
               min={1}
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
             />
           </div>
 
-          <div>
-            <label htmlFor="timeout" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="space-y-2">
+            <Label htmlFor="timeout">
               Timeout (seconds)
-            </label>
-            <input
+            </Label>
+            <Input
               type="number"
               id="timeout"
               value={formData.timeout}
               onChange={(e) => setFormData({ ...formData, timeout: parseInt(e.target.value) })}
               min={1}
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
             />
           </div>
         </div>
 
-        <div>
-          <label htmlFor="resend_interval" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="space-y-2">
+          <Label htmlFor="resend_interval">
             Resend Notification After X Consecutive Failures
-          </label>
-          <input
+          </Label>
+          <Input
             type="number"
             id="resend_interval"
             value={formData.resend_interval}
             onChange={(e) => setFormData({ ...formData, resend_interval: parseInt(e.target.value) })}
             min={1}
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
           />
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Notification will be sent after {formData.resend_interval || 1} consecutive failure{(formData.resend_interval || 1) > 1 ? 's' : ''},
             then resent every {formData.resend_interval || 1} failure{(formData.resend_interval || 1) > 1 ? 's' : ''} after that.
             Set to 1 to receive notification on every failure.
           </p>
         </div>
 
-        <div>
-          <label htmlFor="ip_version" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <div className="space-y-2">
+          <Label htmlFor="ip_version">
             IP Version
-          </label>
+          </Label>
           <select
             id="ip_version"
             value={formData.ip_version}
             onChange={(e) => setFormData({ ...formData, ip_version: e.target.value })}
-            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
+            className="flex h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30"
           >
             <option value="auto">Auto (IPv4/IPv6)</option>
             <option value="ipv4">IPv4 Only</option>
             <option value="ipv6">IPv6 Only</option>
           </select>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Choose which IP protocol to use for network connections. Auto will try both IPv4 and IPv6.
           </p>
         </div>
       </div>
 
       {/* Notification Configuration */}
-      <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
+      <Separator />
+      <div className="space-y-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
           Notifications
         </h3>
@@ -356,17 +359,16 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
           <div className="space-y-4">
             {/* Use Default Notifications Toggle */}
             <div className="flex items-start gap-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="useDefaults"
                 checked={useDefaultNotifications}
-                onChange={(e) => setUseDefaultNotifications(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                onCheckedChange={(checked) => setUseDefaultNotifications(checked === true)}
+                className="mt-1"
               />
               <div className="flex-1">
-                <label htmlFor="useDefaults" className="text-sm font-medium text-blue-900 dark:text-blue-100 cursor-pointer">
+                <Label htmlFor="useDefaults" className="text-sm font-medium text-blue-900 dark:text-blue-100 cursor-pointer">
                   Use default notifications
-                </label>
+                </Label>
                 <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                   {useDefaultNotifications
                     ? "This monitor will automatically receive all notifications marked as 'Default'. New default notifications will be included automatically."
@@ -384,20 +386,23 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
                   </p>
                   {notifications.length > 0 && (
                     <div className="flex gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => setSelectedNotificationIds(notifications.map(n => n.id))}
-                        className="text-xs px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                        className="text-blue-600 dark:text-blue-400"
                       >
                         Select all
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => setSelectedNotificationIds([])}
-                        className="text-xs px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                       >
                         Unselect all
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -408,35 +413,33 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
                       key={notif.id}
                       className="flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedNotificationIds.includes(notif.id)}
-                        onChange={(e) => {
+                        onCheckedChange={(checked) => {
                           setSelectedNotificationIds(
-                            e.target.checked
+                            checked
                               ? [...selectedNotificationIds, notif.id]
                               : selectedNotificationIds.filter(id => id !== notif.id)
                           );
                         }}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                       />
                       <div className="ml-3 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-gray-900 dark:text-white">
                             {notif.name}
                           </span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                          <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                             {getProviderLabel(notif.type)}
-                          </span>
+                          </Badge>
                           {notif.is_default && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                            <Badge variant="secondary" className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
                               Default
-                            </span>
+                            </Badge>
                           )}
                           {!notif.active && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                            <Badge variant="secondary">
                               Inactive
-                            </span>
+                            </Badge>
                           )}
                         </div>
                       </div>
@@ -460,13 +463,14 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {notifications.filter(n => n.is_default).map((notif) => (
-                    <span
+                    <Badge
                       key={notif.id}
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-sm"
+                      variant="secondary"
+                      className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-3 py-1 h-auto"
                     >
                       {notif.name}
-                      <span className="text-xs opacity-70">({getProviderLabel(notif.type)})</span>
-                    </span>
+                      <span className="text-xs opacity-70 ml-1">({getProviderLabel(notif.type)})</span>
+                    </Badge>
                   ))}
                 </div>
               </div>
@@ -483,375 +487,376 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
 
       {/* HTTP-specific configuration */}
       {formData.type === 'http' && (
-        <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">HTTP Configuration</h3>
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">HTTP Configuration</h3>
 
-          <div>
-            <label htmlFor="method" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              HTTP Method
-            </label>
-            <select
-              id="method"
-              value={httpConfig.method}
-              onChange={(e) => setHttpConfig({ ...httpConfig, method: e.target.value })}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-            >
-              {HTTP_METHODS.map((method) => (
-                <option key={method} value={method}>
-                  {method}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="acceptedStatusCodes" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Accepted Status Codes
-            </label>
-            <input
-              type="text"
-              id="acceptedStatusCodes"
-              value={httpConfig.acceptedStatusCodes}
-              onChange={(e) => setHttpConfig({ ...httpConfig, acceptedStatusCodes: e.target.value })}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-              placeholder="200-299,301,302"
-            />
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Comma-separated list of acceptable status codes or ranges (e.g., 200-299,301)
-            </p>
-          </div>
-
-          {/* Headers */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Custom Headers
-            </label>
             <div className="space-y-2">
-              {Object.entries(httpConfig.headers).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-2">
-                  <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
-                    {key}: {value}
-                  </span>
-                  <button
+              <Label htmlFor="method">
+                HTTP Method
+              </Label>
+              <select
+                id="method"
+                value={httpConfig.method}
+                onChange={(e) => setHttpConfig({ ...httpConfig, method: e.target.value })}
+                className="flex h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30"
+              >
+                {HTTP_METHODS.map((method) => (
+                  <option key={method} value={method}>
+                    {method}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="acceptedStatusCodes">
+                Accepted Status Codes
+              </Label>
+              <Input
+                type="text"
+                id="acceptedStatusCodes"
+                value={httpConfig.acceptedStatusCodes}
+                onChange={(e) => setHttpConfig({ ...httpConfig, acceptedStatusCodes: e.target.value })}
+                placeholder="200-299,301,302"
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Comma-separated list of acceptable status codes or ranges (e.g., 200-299,301)
+              </p>
+            </div>
+
+            {/* Headers */}
+            <div className="space-y-2">
+              <Label>
+                Custom Headers
+              </Label>
+              <div className="space-y-2">
+                {Object.entries(httpConfig.headers).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
+                      {key}: {value}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => removeHeader(key)}
+                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={headerKey}
+                    onChange={(e) => setHeaderKey(e.target.value)}
+                    placeholder="Header name"
+                    className="flex-1"
+                  />
+                  <Input
+                    type="text"
+                    value={headerValue}
+                    onChange={(e) => setHeaderValue(e.target.value)}
+                    placeholder="Header value"
+                    className="flex-1"
+                  />
+                  <Button
                     type="button"
-                    onClick={() => removeHeader(key)}
-                    className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                    variant="secondary"
+                    onClick={addHeader}
                   >
-                    Remove
-                  </button>
+                    Add
+                  </Button>
                 </div>
-              ))}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={headerKey}
-                  onChange={(e) => setHeaderKey(e.target.value)}
-                  placeholder="Header name"
-                  className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-                />
-                <input
-                  type="text"
-                  value={headerValue}
-                  onChange={(e) => setHeaderValue(e.target.value)}
-                  placeholder="Header value"
-                  className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-                />
-                <button
-                  type="button"
-                  onClick={addHeader}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
-                >
-                  Add
-                </button>
               </div>
             </div>
-          </div>
 
-          {/* Request Body */}
-          {(httpConfig.method === 'POST' || httpConfig.method === 'PUT' || httpConfig.method === 'PATCH') && (
-            <div>
-              <label htmlFor="body" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Request Body
-              </label>
-              <textarea
-                id="body"
-                value={httpConfig.body}
-                onChange={(e) => setHttpConfig({ ...httpConfig, body: e.target.value })}
-                rows={4}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-                placeholder="Optional request body (JSON, XML, etc.)"
-              />
-            </div>
-          )}
+            {/* Request Body */}
+            {(httpConfig.method === 'POST' || httpConfig.method === 'PUT' || httpConfig.method === 'PATCH') && (
+              <div className="space-y-2">
+                <Label htmlFor="body">
+                  Request Body
+                </Label>
+                <Textarea
+                  id="body"
+                  value={httpConfig.body}
+                  onChange={(e) => setHttpConfig({ ...httpConfig, body: e.target.value })}
+                  rows={4}
+                  placeholder="Optional request body (JSON, XML, etc.)"
+                />
+              </div>
+            )}
 
-          {/* Keyword Search */}
-          <div>
-            <label htmlFor="keyword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Keyword (optional)
-            </label>
-            <input
-              type="text"
-              id="keyword"
-              value={httpConfig.keyword}
-              onChange={(e) => setHttpConfig({ ...httpConfig, keyword: e.target.value })}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-              placeholder="Search for this keyword in response"
-            />
-            <div className="mt-2 flex items-center">
-              <input
-                type="checkbox"
-                id="invertKeyword"
-                checked={httpConfig.invertKeyword}
-                onChange={(e) => setHttpConfig({ ...httpConfig, invertKeyword: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+            {/* Keyword Search */}
+            <div className="space-y-2">
+              <Label htmlFor="keyword">
+                Keyword (optional)
+              </Label>
+              <Input
+                type="text"
+                id="keyword"
+                value={httpConfig.keyword}
+                onChange={(e) => setHttpConfig({ ...httpConfig, keyword: e.target.value })}
+                placeholder="Search for this keyword in response"
               />
-              <label htmlFor="invertKeyword" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                Alert if keyword is NOT found
-              </label>
-            </div>
-          </div>
-
-          {/* Advanced Options */}
-          <div className="space-y-2">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="ignoreTLS"
-                checked={httpConfig.ignoreTLS}
-                onChange={(e) => setHttpConfig({ ...httpConfig, ignoreTLS: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <label htmlFor="ignoreTLS" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                Ignore TLS/SSL errors
-              </label>
+              <div className="mt-2 flex items-center gap-2">
+                <Checkbox
+                  id="invertKeyword"
+                  checked={httpConfig.invertKeyword}
+                  onCheckedChange={(checked) => setHttpConfig({ ...httpConfig, invertKeyword: checked === true })}
+                />
+                <Label htmlFor="invertKeyword" className="font-normal">
+                  Alert if keyword is NOT found
+                </Label>
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="maxRedirects" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Maximum Redirects
-              </label>
-              <input
-                type="number"
-                id="maxRedirects"
-                value={httpConfig.maxRedirects}
-                onChange={(e) => setHttpConfig({ ...httpConfig, maxRedirects: parseInt(e.target.value) })}
-                min={0}
-                max={20}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-              />
+            {/* Advanced Options */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="ignoreTLS"
+                  checked={httpConfig.ignoreTLS}
+                  onCheckedChange={(checked) => setHttpConfig({ ...httpConfig, ignoreTLS: checked === true })}
+                />
+                <Label htmlFor="ignoreTLS" className="font-normal">
+                  Ignore TLS/SSL errors
+                </Label>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="maxRedirects">
+                  Maximum Redirects
+                </Label>
+                <Input
+                  type="number"
+                  id="maxRedirects"
+                  value={httpConfig.maxRedirects}
+                  onChange={(e) => setHttpConfig({ ...httpConfig, maxRedirects: parseInt(e.target.value) })}
+                  min={0}
+                  max={20}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="certificateId">
+                Client Certificate (mTLS)
+              </Label>
+              <select
+                id="certificateId"
+                value={httpConfig.certificateId || ''}
+                onChange={(e) => setHttpConfig({ ...httpConfig, certificateId: e.target.value ? Number(e.target.value) : 0 })}
+                className="flex h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30"
+              >
+                <option value="">None</option>
+                {certificates.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Optional: select a client certificate for mTLS authentication
+              </p>
             </div>
           </div>
-
-          <div>
-            <label htmlFor="certificateId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Client Certificate (mTLS)
-            </label>
-            <select
-              id="certificateId"
-              value={httpConfig.certificateId || ''}
-              onChange={(e) => setHttpConfig({ ...httpConfig, certificateId: e.target.value ? Number(e.target.value) : 0 })}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-            >
-              <option value="">None</option>
-              {certificates.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Optional: select a client certificate for mTLS authentication
-            </p>
-          </div>
-        </div>
+        </>
       )}
 
       {/* TCP-specific configuration */}
       {formData.type === 'tcp' && (
-        <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">TCP Configuration</h3>
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">TCP Configuration</h3>
 
-          <div>
-            <label htmlFor="port" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Port
-            </label>
-            <input
-              type="number"
-              id="port"
-              value={tcpConfig.port}
-              onChange={(e) => setTcpConfig({ ...tcpConfig, port: parseInt(e.target.value) })}
-              min={1}
-              max={65535}
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-              placeholder="80"
-            />
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Port number to check (1-65535)
-            </p>
+            <div className="space-y-2">
+              <Label htmlFor="port">
+                Port
+              </Label>
+              <Input
+                type="number"
+                id="port"
+                value={tcpConfig.port}
+                onChange={(e) => setTcpConfig({ ...tcpConfig, port: parseInt(e.target.value) })}
+                min={1}
+                max={65535}
+                required
+                placeholder="80"
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Port number to check (1-65535)
+              </p>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Ping-specific configuration */}
       {formData.type === 'ping' && (
-        <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Ping Configuration</h3>
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Ping Configuration</h3>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="packetCount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Packet Count
-              </label>
-              <input
-                type="number"
-                id="packetCount"
-                value={pingConfig.packet_count}
-                onChange={(e) => setPingConfig({ ...pingConfig, packet_count: parseInt(e.target.value) })}
-                min={1}
-                max={100}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-              />
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Number of packets to send (default: 4)
-              </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="packetCount">
+                  Packet Count
+                </Label>
+                <Input
+                  type="number"
+                  id="packetCount"
+                  value={pingConfig.packet_count}
+                  onChange={(e) => setPingConfig({ ...pingConfig, packet_count: parseInt(e.target.value) })}
+                  min={1}
+                  max={100}
+                />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Number of packets to send (default: 4)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="packetSize">
+                  Packet Size (bytes)
+                </Label>
+                <Input
+                  type="number"
+                  id="packetSize"
+                  value={pingConfig.packet_size}
+                  onChange={(e) => setPingConfig({ ...pingConfig, packet_size: parseInt(e.target.value) })}
+                  min={1}
+                  max={65500}
+                />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Size of each packet (default: 56)
+                </p>
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="packetSize" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Packet Size (bytes)
-              </label>
-              <input
-                type="number"
-                id="packetSize"
-                value={pingConfig.packet_size}
-                onChange={(e) => setPingConfig({ ...pingConfig, packet_size: parseInt(e.target.value) })}
-                min={1}
-                max={65500}
-                className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="privileged"
+                checked={pingConfig.privileged}
+                onCheckedChange={(checked) => setPingConfig({ ...pingConfig, privileged: checked === true })}
               />
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Size of each packet (default: 56)
-              </p>
+              <Label htmlFor="privileged" className="font-normal">
+                Use privileged mode (requires root/admin, enables raw ICMP)
+              </Label>
             </div>
           </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="privileged"
-              checked={pingConfig.privileged}
-              onChange={(e) => setPingConfig({ ...pingConfig, privileged: e.target.checked })}
-              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <label htmlFor="privileged" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-              Use privileged mode (requires root/admin, enables raw ICMP)
-            </label>
-          </div>
-        </div>
+        </>
       )}
 
       {/* DNS-specific configuration */}
       {formData.type === 'dns' && (
-        <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">DNS Configuration</h3>
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">DNS Configuration</h3>
 
-          <div>
-            <label htmlFor="queryType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Query Type
-            </label>
-            <select
-              id="queryType"
-              value={dnsConfig.query_type}
-              onChange={(e) => setDnsConfig({ ...dnsConfig, query_type: e.target.value })}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-            >
-              <option value="A">A (IPv4 Address)</option>
-              <option value="AAAA">AAAA (IPv6 Address)</option>
-              <option value="CNAME">CNAME (Canonical Name)</option>
-              <option value="MX">MX (Mail Exchange)</option>
-              <option value="NS">NS (Name Server)</option>
-              <option value="TXT">TXT (Text Record)</option>
-            </select>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="queryType">
+                Query Type
+              </Label>
+              <select
+                id="queryType"
+                value={dnsConfig.query_type}
+                onChange={(e) => setDnsConfig({ ...dnsConfig, query_type: e.target.value })}
+                className="flex h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30"
+              >
+                <option value="A">A (IPv4 Address)</option>
+                <option value="AAAA">AAAA (IPv6 Address)</option>
+                <option value="CNAME">CNAME (Canonical Name)</option>
+                <option value="MX">MX (Mail Exchange)</option>
+                <option value="NS">NS (Name Server)</option>
+                <option value="TXT">TXT (Text Record)</option>
+              </select>
+            </div>
 
-          <div>
-            <label htmlFor="dnsServer" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              DNS Server (optional)
-            </label>
-            <input
-              type="text"
-              id="dnsServer"
-              value={dnsConfig.dns_server}
-              onChange={(e) => setDnsConfig({ ...dnsConfig, dns_server: e.target.value })}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-              placeholder="8.8.8.8 or dns.google.com"
-            />
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Custom DNS server to use (leave empty for system default)
-            </p>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="dnsServer">
+                DNS Server (optional)
+              </Label>
+              <Input
+                type="text"
+                id="dnsServer"
+                value={dnsConfig.dns_server}
+                onChange={(e) => setDnsConfig({ ...dnsConfig, dns_server: e.target.value })}
+                placeholder="8.8.8.8 or dns.google.com"
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Custom DNS server to use (leave empty for system default)
+              </p>
+            </div>
 
-          <div>
-            <label htmlFor="expectedResult" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Expected Result (optional)
-            </label>
-            <input
-              type="text"
-              id="expectedResult"
-              value={dnsConfig.expected_result}
-              onChange={(e) => setDnsConfig({ ...dnsConfig, expected_result: e.target.value })}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-              placeholder="Expected value in DNS response"
-            />
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Alert if this value is not found in the response
-            </p>
+            <div className="space-y-2">
+              <Label htmlFor="expectedResult">
+                Expected Result (optional)
+              </Label>
+              <Input
+                type="text"
+                id="expectedResult"
+                value={dnsConfig.expected_result}
+                onChange={(e) => setDnsConfig({ ...dnsConfig, expected_result: e.target.value })}
+                placeholder="Expected value in DNS response"
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Alert if this value is not found in the response
+              </p>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Docker-specific configuration */}
       {formData.type === 'docker' && (
-        <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Docker Configuration</h3>
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Docker Configuration</h3>
 
-          <div>
-            <label htmlFor="dockerHost" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Docker Host (optional)
-            </label>
-            <input
-              type="text"
-              id="dockerHost"
-              value={dockerConfig.docker_host}
-              onChange={(e) => setDockerConfig({ ...dockerConfig, docker_host: e.target.value })}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
-              placeholder="unix:///var/run/docker.sock or tcp://host:2375"
-            />
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Docker daemon socket (leave empty for default local socket)
-            </p>
+            <div className="space-y-2">
+              <Label htmlFor="dockerHost">
+                Docker Host (optional)
+              </Label>
+              <Input
+                type="text"
+                id="dockerHost"
+                value={dockerConfig.docker_host}
+                onChange={(e) => setDockerConfig({ ...dockerConfig, docker_host: e.target.value })}
+                placeholder="unix:///var/run/docker.sock or tcp://host:2375"
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Docker daemon socket (leave empty for default local socket)
+              </p>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Action Buttons */}
-      <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700 pt-6">
+      <Separator />
+      <div className="flex justify-end gap-3">
         {onCancel && (
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
           >
             Cancel
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="submit"
           disabled={isSubmitting}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? 'Saving...' : 'Save Monitor'}
-        </button>
+        </Button>
       </div>
     </form>
   );

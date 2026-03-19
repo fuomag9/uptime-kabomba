@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, CreateMonitorRequest } from '@/lib/api';
 import MonitorForm from '@/components/monitors/MonitorForm';
+import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function NewMonitorPage() {
   const router = useRouter();
@@ -44,20 +46,22 @@ export default function NewMonitorPage() {
       </div>
 
       {createMutation.error && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-          <p className="text-sm text-red-800 dark:text-red-200">
+        <Alert variant="destructive" className="mb-6">
+          <AlertDescription>
             Failed to create monitor: {(createMutation.error as any).message}
-          </p>
-        </div>
+          </AlertDescription>
+        </Alert>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <MonitorForm
-          onSubmit={handleSubmit}
-          onCancel={() => router.push('/monitors')}
-          isSubmitting={createMutation.isPending}
-        />
-      </div>
+      <Card>
+        <CardContent className="p-6">
+          <MonitorForm
+            onSubmit={handleSubmit}
+            onCancel={() => router.push('/monitors')}
+            isSubmitting={createMutation.isPending}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -6,6 +6,13 @@ import { useMonitorHeartbeat } from '@/hooks/useMonitorHeartbeats';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { buttonVariants } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { Plus, Search } from 'lucide-react';
 
 const STATUS_COLORS = {
   0: { dot: 'bg-red-500', label: 'Down' },
@@ -27,26 +34,106 @@ function MonitorSidebarItem({ monitor }: { monitor: any }) {
   return (
     <Link
       href={`/monitors/${monitor.id}`}
-      className={`block px-3 py-2 rounded-md text-sm transition-colors ${isActive
-        ? 'bg-primary text-white'
-        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-        } ${monitor.active ? '' : 'opacity-70'}`}
+      className={cn(
+        buttonVariants({ variant: "ghost" }),
+        "w-full justify-start px-3 py-2 h-auto font-normal",
+        isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
+        !monitor.active && "opacity-70"
+      )}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between w-full">
         <div className="flex items-center min-w-0 flex-1">
-          <div className={`h-2 w-2 rounded-full ${statusStyle.dot} mr-2 flex-shrink-0`} />
+          <div className={cn("h-2 w-2 rounded-full mr-2 flex-shrink-0", statusStyle.dot)} />
           <span className="truncate">{monitor.name}</span>
           {!monitor.active && (
-            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">⏸</span>
+            <span className="ml-2 text-xs text-muted-foreground">&#9198;</span>
           )}
         </div>
         {ping !== undefined && (
-          <span className={`ml-2 text-xs flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+          <span className={cn(
+            "ml-2 text-xs flex-shrink-0",
+            isActive ? "text-primary-foreground" : "text-muted-foreground"
+          )}>
             {ping}ms
           </span>
         )}
       </div>
     </Link>
+  );
+}
+
+function SidebarContent({
+  query,
+  setQuery,
+  sortedMonitors,
+  isLoading,
+  onClose,
+}: {
+  query: string;
+  setQuery: (q: string) => void;
+  sortedMonitors: any[];
+  isLoading: boolean;
+  onClose?: () => void;
+}) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="monitor-search"
+            type="search"
+            placeholder="Search monitors"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Monitors</h2>
+          <Link
+            href="/monitors/new"
+            title="Add Monitor"
+            onClick={onClose}
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "icon" }),
+              "h-7 w-7"
+            )}
+          >
+            <Plus className="h-4 w-4 text-primary" />
+          </Link>
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1 px-4 pb-4">
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        ) : sortedMonitors.length > 0 ? (
+          <div className="space-y-1">
+            {sortedMonitors.map((monitor) => (
+              <div key={monitor.id} onClick={onClose}>
+                <MonitorSidebarItem monitor={monitor} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">No monitors yet</p>
+            <Link
+              href="/monitors/new"
+              className="mt-2 inline-block text-sm text-primary hover:underline"
+              onClick={onClose}
+            >
+              Add your first monitor
+            </Link>
+          </div>
+        )}
+      </ScrollArea>
+    </div>
   );
 }
 
@@ -75,128 +162,57 @@ export function MonitorSidebar({
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }, [monitors, query]);
 
-  // Mobile drawer overlay classes
-  const drawerClasses = isOpen
-    ? 'fixed inset-0 z-50 flex'
-    : 'hidden md:flex md:w-64 md:flex-col';
+  const mobileNavLinks = [
+    { href: '/notifications', label: 'Notifications', isActive: pathname === '/notifications' },
+    { href: '/status-pages', label: 'Status Pages', isActive: pathname === '/status-pages' },
+    { href: '/settings', label: 'Settings', isActive: pathname === '/settings' },
+  ];
 
   return (
     <>
-      {/* Mobile Backdrop */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-gray-600 bg-opacity-75 md:hidden z-40"
-          onClick={onClose}
-        />
-      )}
-      
-      <div className={`${drawerClasses} md:h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto w-64 flex flex-col`}>
-        {isOpen && (
-           <div className="flex items-center justify-end p-4 md:hidden">
-             <button
-               onClick={onClose}
-               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-             >
-               <span className="sr-only">Close sidebar</span>
-               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-               </svg>
-             </button>
-           </div>
-        )}
-
-        <div className="p-4 flex-1">
-          <div className="mb-4">
-            <label className="sr-only" htmlFor="monitor-search">
-              Search monitors
-            </label>
-            <input
-              id="monitor-search"
-              type="search"
-              placeholder="Search monitors"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
-            />
-          </div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Monitors</h2>
-            <Link
-              href="/monitors/new"
-              className="text-primary hover:text-primary/80"
-              title="Add Monitor"
-              onClick={onClose}
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </Link>
-          </div>
-
-          {isLoading ? (
-            <div className="text-center py-4">
-              <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-solid border-primary border-r-transparent"></div>
-            </div>
-          ) : sortedMonitors.length > 0 ? (
+      {/* Mobile Sheet */}
+      <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose?.(); }}>
+        <SheetContent side="left" className="w-64 p-0">
+          <SheetHeader className="p-4 pb-0">
+            <SheetTitle>Monitors</SheetTitle>
+          </SheetHeader>
+          <SidebarContent
+            query={query}
+            setQuery={setQuery}
+            sortedMonitors={sortedMonitors}
+            isLoading={isLoading}
+            onClose={onClose}
+          />
+          <div className="p-4 border-t border-border">
             <div className="space-y-1">
-              {sortedMonitors.map((monitor) => (
-                <div key={monitor.id} onClick={onClose}>
-                   <MonitorSidebarItem monitor={monitor} />
-                </div>
+              {mobileNavLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={onClose}
+                  className={cn(
+                    buttonVariants({ variant: "ghost" }),
+                    "w-full justify-start",
+                    link.isActive && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  {link.label}
+                </Link>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-sm text-gray-500 dark:text-gray-400">No monitors yet</p>
-              <Link
-                href="/monitors/new"
-                className="mt-2 inline-block text-sm text-primary hover:underline"
-                onClick={onClose}
-              >
-                Add your first monitor
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Mobile Navigation Links */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 md:hidden">
-          <div className="space-y-1">
-            <Link
-                href="/notifications"
-                onClick={onClose}
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  pathname === '/notifications'
-                    ? 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
-                }`}
-            >
-              Notifications
-            </Link>
-            <Link
-                href="/status-pages"
-                onClick={onClose}
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  pathname === '/status-pages'
-                    ? 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
-                }`}
-            >
-              Status Pages
-            </Link>
-            <Link
-                href="/settings"
-                onClick={onClose}
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  pathname === '/settings'
-                    ? 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
-                }`}
-            >
-              Settings
-            </Link>
           </div>
-        </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden md:flex md:w-64 md:flex-col md:h-full bg-card border-r border-border">
+        <SidebarContent
+          query={query}
+          setQuery={setQuery}
+          sortedMonitors={sortedMonitors}
+          isLoading={isLoading}
+          onClose={onClose}
+        />
       </div>
     </>
   );

@@ -3,7 +3,14 @@
 function getWebSocketURL(): string {
   if (typeof window === 'undefined') return '';
 
-  // Use the same host as the frontend, but with ws/wss protocol
+  // If NEXT_PUBLIC_WS_URL is set, use it directly (e.g. for direct backend access)
+  const envWsUrl = process.env.NEXT_PUBLIC_WS_URL;
+  if (envWsUrl) return envWsUrl;
+
+  // Default: use the same host as the frontend, but with ws/wss protocol
+  // Note: Next.js rewrites don't support WebSocket upgrades, so this only works
+  // when a reverse proxy (nginx, caddy, etc.) handles the /ws route separately,
+  // or when the frontend and backend share the same origin.
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
   return `${protocol}//${host}/ws`;

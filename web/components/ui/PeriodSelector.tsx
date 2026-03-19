@@ -1,6 +1,16 @@
 "use client";
 
 import { useState } from 'react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 
 export type PeriodType = '1h' | '3h' | '6h' | '24h' | 'custom';
 
@@ -72,106 +82,91 @@ export default function PeriodSelector({
 
   if (compact) {
     return (
-      <div className={`flex gap-1 ${className}`}>
+      <ToggleGroup
+        type="single"
+        value={value}
+        onValueChange={(val) => {
+          if (val) handlePeriodClick(val as PeriodType);
+        }}
+        className={className}
+        size="sm"
+      >
         {options.map((option) => (
-          <button
+          <ToggleGroupItem
             key={option.value}
-            onClick={() => handlePeriodClick(option.value)}
-            className={`
-              text-xs px-2 py-1 rounded-md font-medium transition-all duration-200
-              ${
-                value === option.value
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }
-            `}
+            value={option.value}
             title={option.description}
           >
             {option.label}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
     );
   }
 
   return (
     <div className={`relative ${className}`}>
-      {/* Segmented Control */}
-      <div className="inline-flex items-center rounded-lg bg-gray-100 dark:bg-gray-800 p-1 shadow-inner">
+      <ToggleGroup
+        type="single"
+        value={value}
+        onValueChange={(val) => {
+          if (val) handlePeriodClick(val as PeriodType);
+        }}
+        variant="outline"
+      >
         {options.map((option) => (
-          <button
+          <ToggleGroupItem
             key={option.value}
-            onClick={() => handlePeriodClick(option.value)}
-            className={`
-              relative px-4 py-2 text-sm font-medium rounded-md transition-all duration-200
-              ${
-                value === option.value
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }
-            `}
+            value={option.value}
             title={option.description}
           >
             {option.label}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
 
-      {/* Custom Date Range Picker Modal */}
-      {showCustomPicker && (
-        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Select Custom Date Range
-            </h3>
+      <Dialog open={showCustomPicker} onOpenChange={setShowCustomPicker}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Custom Date Range</DialogTitle>
+          </DialogHeader>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Start Date & Time
-                </label>
-                <input
-                  type="datetime-local"
-                  value={formatDateForInput(tempStart)}
-                  onChange={(e) => setTempStart(new Date(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  End Date & Time
-                </label>
-                <input
-                  type="datetime-local"
-                  value={formatDateForInput(tempEnd)}
-                  onChange={(e) => setTempEnd(new Date(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
-              </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Start Date & Time</Label>
+              <Input
+                type="datetime-local"
+                value={formatDateForInput(tempStart)}
+                onChange={(e) => setTempStart(new Date(e.target.value))}
+              />
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setShowCustomPicker(false)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCustomApply}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors font-medium shadow-sm"
-              >
-                Apply
-              </button>
+            <div className="space-y-2">
+              <Label>End Date & Time</Label>
+              <Input
+                type="datetime-local"
+                value={formatDateForInput(tempEnd)}
+                onChange={(e) => setTempEnd(new Date(e.target.value))}
+              />
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Show selected custom range */}
+          <div className="flex justify-end gap-3 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowCustomPicker(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCustomApply}>
+              Apply
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {value === 'custom' && customStart && customEnd && (
-        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <div className="mt-2 text-xs text-muted-foreground">
           {formatDateShort(customStart)} - {formatDateShort(customEnd)}
         </div>
       )}

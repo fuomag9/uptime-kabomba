@@ -5,6 +5,10 @@ import { apiClient, UpdateMonitorRequest } from '@/lib/api';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MonitorForm from '@/components/monitors/MonitorForm';
+import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ChevronLeft } from 'lucide-react';
 
 export default function EditMonitorPage() {
   const params = useParams();
@@ -41,9 +45,13 @@ export default function EditMonitorPage() {
 
   if (isLoading) {
     return (
-      <div className="text-center py-12">
-        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading monitor...</p>
+      <div className="max-w-4xl space-y-6">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-5 w-5" />
+          <Skeleton className="h-8 w-48" />
+        </div>
+        <Skeleton className="h-4 w-64" />
+        <Skeleton className="h-96" />
       </div>
     );
   }
@@ -67,9 +75,7 @@ export default function EditMonitorPage() {
             href={`/monitors/${monitorId}`}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            <ChevronLeft className="h-5 w-5" />
           </Link>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Edit Monitor
@@ -81,37 +87,39 @@ export default function EditMonitorPage() {
       </div>
 
       {updateMutation.error && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-          <p className="text-sm text-red-800 dark:text-red-200">
+        <Alert variant="destructive" className="mb-6">
+          <AlertDescription>
             Failed to update monitor: {(updateMutation.error as any).message}
-          </p>
-        </div>
+          </AlertDescription>
+        </Alert>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <MonitorForm
-          initialData={{
-            name: monitor.name,
-            type: monitor.type,
-            url: monitor.url,
-            interval: monitor.interval,
-            timeout: monitor.timeout,
-            resend_interval: monitor.resend_interval,
-            ip_version: monitor.ip_version,
-            config: monitor.config,
-          }}
-          monitorId={monitorId}
-          notificationsConfigured={monitor.notifications_configured}
-          onSubmit={(data) => updateMutation.mutate({
-            ...data.monitor,
-            active: monitor.active,
-            notificationIds: data.notificationIds,
-            useDefaultNotifications: data.useDefaultNotifications,
-          })}
-          onCancel={() => router.push(`/monitors/${monitorId}`)}
-          isSubmitting={updateMutation.isPending}
-        />
-      </div>
+      <Card>
+        <CardContent className="p-6">
+          <MonitorForm
+            initialData={{
+              name: monitor.name,
+              type: monitor.type,
+              url: monitor.url,
+              interval: monitor.interval,
+              timeout: monitor.timeout,
+              resend_interval: monitor.resend_interval,
+              ip_version: monitor.ip_version,
+              config: monitor.config,
+            }}
+            monitorId={monitorId}
+            notificationsConfigured={monitor.notifications_configured}
+            onSubmit={(data) => updateMutation.mutate({
+              ...data.monitor,
+              active: monitor.active,
+              notificationIds: data.notificationIds,
+              useDefaultNotifications: data.useDefaultNotifications,
+            })}
+            onCancel={() => router.push(`/monitors/${monitorId}`)}
+            isSubmitting={updateMutation.isPending}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

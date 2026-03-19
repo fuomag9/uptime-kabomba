@@ -4,6 +4,38 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient, Certificate, CreateCertificateRequest, UpdateCertificateRequest } from '@/lib/api';
 import { parseP12, P12ParseError } from '@/lib/parsep12';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 export default function CertificatesPage() {
   const router = useRouter();
@@ -13,20 +45,20 @@ export default function CertificatesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Certificate | null>(null);
 
-  // Form state
   const [name, setName] = useState('');
   const [certPem, setCertPem] = useState('');
   const [keyPem, setKeyPem] = useState('');
   const [caPem, setCaPem] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Import .p12 state
   const [showImport, setShowImport] = useState(false);
   const [importName, setImportName] = useState('');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPassword, setImportPassword] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -72,19 +104,29 @@ export default function CertificatesPage() {
       setShowForm(false);
       await load();
     } catch (err: any) {
-      alert('Failed to save: ' + (err.message || 'Unknown error'));
+      toast.error('Failed to save: ' + (err.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Delete this certificate?')) return;
     try {
       await apiClient.deleteCertificate(id);
       setCerts(certs.filter((c) => c.id !== id));
     } catch (err: any) {
-      alert('Failed to delete: ' + (err.message || 'Unknown error'));
+      toast.error('Failed to delete: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  function handleDeleteRequest(id: number) {
+    setDeleteId(id);
+  }
+
+  function handleDeleteConfirm() {
+    if (deleteId !== null) {
+      handleDelete(deleteId);
+      setDeleteId(null);
     }
   }
 
@@ -132,195 +174,236 @@ export default function CertificatesPage() {
       if (err instanceof P12ParseError) {
         setImportError(err.message);
       } else {
-        alert('Failed to import: ' + (err.message || 'Unknown error'));
+        toast.error('Failed to import: ' + (err.message || 'Unknown error'));
       }
     } finally {
       setImporting(false);
     }
   }
 
-  if (loading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-48" />
+          <div className="flex gap-3">
+            <Skeleton className="h-8 w-28" />
+            <Skeleton className="h-8 w-36" />
+          </div>
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Client Certificates</h1>
+        <h1 className="text-2xl font-bold">Client Certificates</h1>
         <div className="flex gap-3">
-          <button
-            onClick={openImport}
-            className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
+          <Button variant="outline" onClick={openImport}>
             Import .p12
-          </button>
-          <button
-            onClick={openCreate}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90"
-          >
+          </Button>
+          <Button onClick={openCreate}>
             Add Certificate
-          </button>
+          </Button>
         </div>
       </div>
 
-      {error && <p className="mb-4 text-red-500">{error}</p>}
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      {showImport && (
-        <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Import .p12 Certificate</h2>
+      <Dialog open={showImport} onOpenChange={(open) => { if (!open) setShowImport(false); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import .p12 Certificate</DialogTitle>
+          </DialogHeader>
           <form onSubmit={handleImport} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="import-name">Name</Label>
+              <Input
+                id="import-name"
                 type="text"
                 value={importName}
                 onChange={(e) => setImportName(e.target.value)}
                 placeholder="Leave blank to use filename"
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Certificate file (.p12 / .pfx)</label>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="import-file">Certificate file (.p12 / .pfx)</Label>
+              <Input
+                id="import-file"
                 type="file"
                 accept=".p12,.pfx"
                 required
                 onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="import-password">Password</Label>
+              <Input
+                id="import-password"
                 type="password"
                 value={importPassword}
                 onChange={(e) => setImportPassword(e.target.value)}
                 placeholder="Certificate password"
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
             {importError && (
-              <p className="text-sm text-red-500">{importError}</p>
+              <Alert variant="destructive">
+                <AlertDescription>{importError}</AlertDescription>
+              </Alert>
             )}
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={importing}
-                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
-              >
-                {importing ? 'Importing...' : 'Import'}
-              </button>
-              <button
+            <div className="flex gap-3 justify-end">
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setShowImport(false)}
-                className="rounded-md bg-gray-200 dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300"
               >
                 Cancel
-              </button>
+              </Button>
+              <Button
+                type="submit"
+                disabled={importing}
+              >
+                {importing ? 'Importing...' : 'Import'}
+              </Button>
             </div>
           </form>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {showForm && (
-        <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            {editing ? 'Edit Certificate' : 'New Certificate'}
-          </h2>
+      <Dialog open={showForm} onOpenChange={(open) => { if (!open) setShowForm(false); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Edit Certificate' : 'New Certificate'}</DialogTitle>
+          </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="cert-name">Name</Label>
+              <Input
+                id="cert-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client Certificate (PEM)</label>
-              <textarea
+            <div className="space-y-2">
+              <Label htmlFor="cert-pem">Client Certificate (PEM)</Label>
+              <Textarea
+                id="cert-pem"
                 value={certPem}
                 onChange={(e) => setCertPem(e.target.value)}
                 required
                 rows={6}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-mono text-gray-900 dark:text-white"
+                className="font-mono text-sm"
                 placeholder="-----BEGIN CERTIFICATE-----"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Private Key (PEM){editing && ' — leave blank to keep existing'}
-              </label>
-              <textarea
+            <div className="space-y-2">
+              <Label htmlFor="key-pem">
+                Private Key (PEM){editing && ' \u2014 leave blank to keep existing'}
+              </Label>
+              <Textarea
+                id="key-pem"
                 value={keyPem}
                 onChange={(e) => setKeyPem(e.target.value)}
                 required={!editing}
                 rows={6}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-mono text-gray-900 dark:text-white"
-                placeholder={editing ? '••••••••' : '-----BEGIN PRIVATE KEY-----'}
+                className="font-mono text-sm"
+                placeholder={editing ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : '-----BEGIN PRIVATE KEY-----'}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CA Certificate (PEM, optional)</label>
-              <textarea
+            <div className="space-y-2">
+              <Label htmlFor="ca-pem">CA Certificate (PEM, optional)</Label>
+              <Textarea
+                id="ca-pem"
                 value={caPem}
                 onChange={(e) => setCaPem(e.target.value)}
                 rows={6}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-mono text-gray-900 dark:text-white"
+                className="font-mono text-sm"
                 placeholder="-----BEGIN CERTIFICATE----- (optional)"
               />
             </div>
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-              <button
+            <div className="flex gap-3 justify-end">
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setShowForm(false)}
-                className="rounded-md bg-gray-200 dark:bg-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300"
               >
                 Cancel
-              </button>
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
             </div>
           </form>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {certs.length === 0 && !showForm && !showImport ? (
-        <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-12 text-center">
-          <p className="text-gray-500 dark:text-gray-400">No certificates yet. Add one to use mTLS with HTTP monitors.</p>
-        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">No certificates yet. Add one to use mTLS with HTTP monitors.</p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">CA</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Created</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-              {certs.map((cert) => (
-                <tr key={cert.id}>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{cert.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{cert.ca_pem ? 'Yes' : 'No'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{new Date(cert.created_at).toLocaleDateString()}</td>
-                  <td className="px-6 py-4 text-right text-sm space-x-3">
-                    <button onClick={() => openEdit(cert)} className="text-primary hover:underline">Edit</button>
-                    <button onClick={() => handleDelete(cert.id)} className="text-red-500 hover:underline">Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>CA</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {certs.map((cert) => (
+                  <TableRow key={cert.id}>
+                    <TableCell className="font-medium">{cert.name}</TableCell>
+                    <TableCell>{cert.ca_pem ? 'Yes' : 'No'}</TableCell>
+                    <TableCell>{new Date(cert.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(cert)}>
+                        Edit
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDeleteRequest(cert.id)}>
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
+
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete certificate?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the certificate.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -2,6 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import { apiClient, User, OAuthConfig, UserSettings } from '@/lib/api';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { LinkIcon, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -9,7 +24,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [retentionSettings, setRetentionSettings] = useState<UserSettings | null>(null);
   const [savingRetention, setSavingRetention] = useState(false);
-  const [retentionMessage, setRetentionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -37,7 +51,6 @@ export default function SettingsPage() {
     if (!retentionSettings) return;
 
     setSavingRetention(true);
-    setRetentionMessage(null);
 
     try {
       const updated = await apiClient.updateUserSettings({
@@ -46,26 +59,27 @@ export default function SettingsPage() {
         daily_stat_retention_days: retentionSettings.daily_stat_retention_days,
       });
       setRetentionSettings(updated);
-      setRetentionMessage({ type: 'success', text: 'Retention settings saved successfully!' });
-      setTimeout(() => setRetentionMessage(null), 5000);
+      toast.success('Retention settings saved successfully!');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save settings';
-      setRetentionMessage({ type: 'error', text: message });
+      toast.error(message);
     } finally {
       setSavingRetention(false);
     }
   };
 
   const handleLinkOAuth = () => {
-    // Redirect to OAuth authorization endpoint (use relative URL)
     window.location.href = '/api/auth/oauth/authorize';
   };
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading settings...</p>
+      <div className="max-w-4xl space-y-6">
+        <Skeleton className="h-8 w-32" />
+        <div className="space-y-6">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
       </div>
     );
   }
@@ -78,124 +92,91 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+      <h1 className="text-2xl font-semibold">
         Settings
       </h1>
 
       <div className="mt-6 space-y-6">
-        {/* Account Information */}
-        <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              Account Information
-            </h3>
-            <div className="mt-4 space-y-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-muted-foreground">Username</Label>
+              <p className="mt-1 text-sm">{user?.username}</p>
+            </div>
+            {user?.email && (
               <div>
-                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Username
-                </label>
-                <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                  {user?.username}
-                </p>
+                <Label className="text-muted-foreground">Email</Label>
+                <p className="mt-1 text-sm">{user.email}</p>
               </div>
-              {user?.email && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    Email
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                    {user.email}
-                  </p>
-                </div>
-              )}
-              <div>
-                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Authentication Method
-                </label>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-sm text-gray-900 dark:text-white">
-                    {getProviderLabel(user?.provider)}
-                  </span>
-                  {user?.provider && user.provider !== 'local' && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
-                      OAuth Enabled
-                    </span>
-                  )}
-                </div>
+            )}
+            <div>
+              <Label className="text-muted-foreground">Authentication Method</Label>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-sm">
+                  {getProviderLabel(user?.provider)}
+                </span>
+                {user?.provider && user.provider !== 'local' && (
+                  <Badge variant="secondary">OAuth Enabled</Badge>
+                )}
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* OAuth Linking */}
         {oauthConfig?.enabled && user?.provider === 'local' && (
-          <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-                Link OAuth Account
-              </h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <Card>
+            <CardHeader>
+              <CardTitle>Link OAuth Account</CardTitle>
+              <CardDescription>
                 Link your account with OAuth to enable single sign-on authentication.
-              </p>
-              <div className="mt-5">
-                <button
-                  type="button"
-                  onClick={handleLinkOAuth}
-                  className="inline-flex items-center rounded-md bg-blue-600 dark:bg-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 dark:hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                >
-                  <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 22C6.486 22 2 17.514 2 12S6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/>
-                  </svg>
-                  Link OAuth Account
-                </button>
-              </div>
-            </div>
-          </div>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={handleLinkOAuth}>
+                <LinkIcon className="mr-2 h-4 w-4" />
+                Link OAuth Account
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
-        {/* OAuth Info */}
         {oauthConfig?.enabled && user?.provider !== 'local' && (
-          <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-                OAuth Configuration
-              </h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <Card>
+            <CardHeader>
+              <CardTitle>OAuth Configuration</CardTitle>
+              <CardDescription>
                 Your account is linked with OAuth. You can sign in using either your password or OAuth.
-              </p>
-              {oauthConfig.issuer && (
-                <div className="mt-4">
-                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    OAuth Provider
-                  </label>
-                  <p className="mt-1 text-sm text-gray-900 dark:text-white break-all">
-                    {oauthConfig.issuer}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+              </CardDescription>
+            </CardHeader>
+            {oauthConfig.issuer && (
+              <CardContent>
+                <Label className="text-muted-foreground">OAuth Provider</Label>
+                <p className="mt-1 text-sm break-all">{oauthConfig.issuer}</p>
+              </CardContent>
+            )}
+          </Card>
         )}
 
-        {/* Data Retention Settings */}
-        <div className="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              Data Retention Settings
-            </h3>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Configure how long your monitoring data is retained before automatic cleanup. Changes take effect on the next cleanup cycle.
-            </p>
+        <Separator />
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Data Retention Settings</CardTitle>
+            <CardDescription>
+              Configure how long your monitoring data is retained before automatic cleanup. Changes take effect on the next cleanup cycle.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             {retentionSettings && (
-              <form onSubmit={handleSaveRetention} className="mt-6 space-y-6">
+              <form onSubmit={handleSaveRetention} className="space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Heartbeat Data
-                    </label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <input
+                  <div className="space-y-2">
+                    <Label>Heartbeat Data</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
                         type="number"
                         min="7"
                         max="365"
@@ -204,21 +185,17 @@ export default function SettingsPage() {
                           ...retentionSettings,
                           heartbeat_retention_days: parseInt(e.target.value) || 90,
                         })}
-                        className="block w-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        className="w-24"
                       />
-                      <span className="text-sm text-gray-500 dark:text-gray-400">days</span>
+                      <span className="text-sm text-muted-foreground">days</span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      7-365 days
-                    </p>
+                    <p className="text-xs text-muted-foreground">7-365 days</p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Hourly Statistics
-                    </label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <input
+                  <div className="space-y-2">
+                    <Label>Hourly Statistics</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
                         type="number"
                         min="30"
                         max="730"
@@ -227,21 +204,17 @@ export default function SettingsPage() {
                           ...retentionSettings,
                           hourly_stat_retention_days: parseInt(e.target.value) || 365,
                         })}
-                        className="block w-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        className="w-24"
                       />
-                      <span className="text-sm text-gray-500 dark:text-gray-400">days</span>
+                      <span className="text-sm text-muted-foreground">days</span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      30-730 days
-                    </p>
+                    <p className="text-xs text-muted-foreground">30-730 days</p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Daily Statistics
-                    </label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <input
+                  <div className="space-y-2">
+                    <Label>Daily Statistics</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
                         type="number"
                         min="90"
                         max="1825"
@@ -250,45 +223,28 @@ export default function SettingsPage() {
                           ...retentionSettings,
                           daily_stat_retention_days: parseInt(e.target.value) || 730,
                         })}
-                        className="block w-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        className="w-24"
                       />
-                      <span className="text-sm text-gray-500 dark:text-gray-400">days</span>
+                      <span className="text-sm text-muted-foreground">days</span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      90-1825 days (up to 5 years)
-                    </p>
+                    <p className="text-xs text-muted-foreground">90-1825 days (up to 5 years)</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <button
-                    type="submit"
-                    disabled={savingRetention}
-                    className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {savingRetention ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Retention Settings'
-                    )}
-                  </button>
-
-                  {retentionMessage && (
-                    <p className={`text-sm ${retentionMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {retentionMessage.text}
-                    </p>
+                <Button type="submit" disabled={savingRetention}>
+                  {savingRetention ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Retention Settings'
                   )}
-                </div>
+                </Button>
               </form>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

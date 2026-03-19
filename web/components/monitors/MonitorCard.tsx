@@ -7,6 +7,8 @@ import { useMonitorHeartbeat } from '@/hooks/useMonitorHeartbeats';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import PeriodSelector from '@/components/ui/PeriodSelector';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface MonitorCardProps {
   monitor: MonitorWithStatus;
@@ -19,6 +21,13 @@ const STATUS_COLORS = {
   1: { bg: 'bg-green-100 dark:bg-green-900/20', text: 'text-green-800 dark:text-green-200', label: 'Up', bar: 'bg-green-500' },
   2: { bg: 'bg-yellow-100 dark:bg-yellow-900/20', text: 'text-yellow-800 dark:text-yellow-200', label: 'Pending', bar: 'bg-yellow-500' },
   3: { bg: 'bg-blue-100 dark:bg-blue-900/20', text: 'text-blue-800 dark:text-blue-200', label: 'Maintenance', bar: 'bg-blue-500' },
+};
+
+const STATUS_BADGE_VARIANT: Record<number, 'default' | 'destructive' | 'secondary'> = {
+  0: 'destructive',
+  1: 'default',
+  2: 'secondary',
+  3: 'secondary',
 };
 
 export default function MonitorCard({ monitor, latestPing, uptime }: MonitorCardProps) {
@@ -38,90 +47,96 @@ export default function MonitorCard({ monitor, latestPing, uptime }: MonitorCard
   const status = heartbeat?.status ?? monitor.last_heartbeat?.status ?? 2;
   const ping = heartbeat?.ping ?? monitor.last_heartbeat?.ping ?? latestPing;
   const statusStyle = STATUS_COLORS[status as keyof typeof STATUS_COLORS];
+  const badgeVariant = STATUS_BADGE_VARIANT[status as keyof typeof STATUS_BADGE_VARIANT] ?? 'secondary';
 
   return (
     <Link href={`/monitors/${monitor.id}`}>
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white truncate">
-                {monitor.name}
-              </h3>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
-                {statusStyle.label}
-              </span>
-              {!monitor.active && (
-                <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                  <span className="text-sm leading-none">⏸</span>
-                  Paused
-                </span>
+      <Card className="p-6 hover:shadow-md transition-shadow cursor-pointer">
+        <CardContent className="p-0">
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white truncate">
+                  {monitor.name}
+                </h3>
+                <Badge
+                  variant={badgeVariant}
+                  className={`${statusStyle.bg} ${statusStyle.text}`}
+                >
+                  {statusStyle.label}
+                </Badge>
+                {!monitor.active && (
+                  <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-sm leading-none">&#x23F8;</span>
+                    Paused
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 truncate">
+                {monitor.type.toUpperCase()} &bull; {monitor.url}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Uptime</p>
+              <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                {uptime !== undefined ? `${uptime.toFixed(2)}%` : '--'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Ping</p>
+              <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                {ping !== undefined ? `${ping}ms` : '--'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Interval</p>
+              <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                {monitor.interval}s
+              </p>
+            </div>
+          </div>
+
+          {/* Period selector and Heartbeat bar */}
+          <div className="mt-4">
+            <div
+              className="mb-2"
+              onClick={(e) => e.preventDefault()}
+            >
+              <PeriodSelector
+                value={period}
+                onChange={(p) => setPeriod(p as '1h' | '3h' | '6h' | '24h')}
+                compact
+              />
+            </div>
+            <div className="h-8 flex items-end gap-0.5">
+              {heartbeats.length > 0 ? (
+                heartbeats.slice(0, 50).reverse().map((hb, i) => {
+                  const hbStatusStyle = STATUS_COLORS[hb.status as keyof typeof STATUS_COLORS];
+                  return (
+                    <div
+                      key={hb.id || i}
+                      className={`flex-1 rounded-sm ${hbStatusStyle.bar}`}
+                      style={{ height: '100%' }}
+                      title={`${hbStatusStyle.label} - ${hb.ping}ms`}
+                    />
+                  );
+                })
+              ) : (
+                Array.from({ length: 50 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-sm"
+                    style={{ height: '100%' }}
+                  />
+                ))
               )}
             </div>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 truncate">
-              {monitor.type.toUpperCase()} • {monitor.url}
-            </p>
           </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-4">
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Uptime</p>
-            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-              {uptime !== undefined ? `${uptime.toFixed(2)}%` : '--'}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Ping</p>
-            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-              {ping !== undefined ? `${ping}ms` : '--'}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Interval</p>
-            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-              {monitor.interval}s
-            </p>
-          </div>
-        </div>
-
-        {/* Period selector and Heartbeat bar */}
-        <div className="mt-4">
-          <div
-            className="mb-2"
-            onClick={(e) => e.preventDefault()}
-          >
-            <PeriodSelector
-              value={period}
-              onChange={(p) => setPeriod(p as '1h' | '3h' | '6h' | '24h')}
-              compact
-            />
-          </div>
-          <div className="h-8 flex items-end gap-0.5">
-            {heartbeats.length > 0 ? (
-              heartbeats.slice(0, 50).reverse().map((hb, i) => {
-                const hbStatusStyle = STATUS_COLORS[hb.status as keyof typeof STATUS_COLORS];
-                return (
-                  <div
-                    key={hb.id || i}
-                    className={`flex-1 rounded-sm ${hbStatusStyle.bar}`}
-                    style={{ height: '100%' }}
-                    title={`${hbStatusStyle.label} - ${hb.ping}ms`}
-                  />
-                );
-              })
-            ) : (
-              Array.from({ length: 50 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-sm"
-                  style={{ height: '100%' }}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </Link>
   );
 }

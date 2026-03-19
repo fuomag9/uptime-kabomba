@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface HeartbeatChartProps {
   heartbeats: Heartbeat[];
@@ -110,7 +111,6 @@ function downsampleData(data: ChartDataPoint[], maxPoints: number): ChartDataPoi
 }
 
 export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatChartProps) {
-  // Transform data for recharts (reverse to show oldest first)
   const chartData: ChartDataPoint[] = heartbeats
     .slice()
     .reverse()
@@ -146,16 +146,17 @@ export default function HeartbeatChart({ heartbeats, height = 300 }: HeartbeatCh
 
   if (chartData.length === 0) {
     return (
-      <div
-        className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg"
-        style={{ height }}
-      >
-        <p className="text-gray-500 dark:text-gray-400">No data available</p>
-      </div>
+      <Card>
+        <CardContent
+          className="flex items-center justify-center"
+          style={{ height }}
+        >
+          <p className="text-muted-foreground">No data available</p>
+        </CardContent>
+      </Card>
     );
   }
 
-  // Calculate domain for Y axis with padding
   const maxPing = Math.max(...displayData.map(d => d.ping));
   const yDomain = [0, Math.ceil(maxPing * 1.2)];
 

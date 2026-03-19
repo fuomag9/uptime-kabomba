@@ -7,6 +7,10 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { MonitorSidebar } from '@/components/MonitorSidebar';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { Menu, LogOut } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -54,113 +58,89 @@ export default function DashboardLayout({
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading...</p>
+        <div className="flex flex-col items-center gap-4">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <Skeleton className="h-4 w-24" />
         </div>
       </div>
     );
   }
 
+  const navLinks = [
+    { href: '/notifications', label: 'Notifications', isActive: pathname === '/notifications' },
+    { href: '/certificates', label: 'Certificates', isActive: pathname === '/certificates' },
+    { href: '/status-pages', label: 'Status Pages', isActive: pathname === '/status-pages' || pathname.startsWith('/status-pages/') },
+    { href: '/settings', label: 'Settings', isActive: pathname === '/settings' },
+  ];
+
   return (
-    <div className="flex h-screen flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow z-10 flex-shrink-0">
+    <div className="flex h-screen flex-col bg-background">
+      <header className="bg-card shadow z-10 flex-shrink-0">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between items-center">
             <div className="flex items-center">
-              <button
-                type="button"
-                className="md:hidden -ml-2 mr-2 p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden -ml-2 mr-2"
                 onClick={() => setSidebarOpen(true)}
               >
+                <Menu className="h-6 w-6" />
                 <span className="sr-only">Open sidebar</span>
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                Uptime Kabomba 💣
+              </Button>
+              <h1 className="text-xl font-bold text-foreground">
+                Uptime Kabomba
               </h1>
-              <div className="ml-4 flex items-center space-x-2 hidden sm:flex">
-                <div className={`h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {connected ? 'Connected' : 'Disconnected'}
-                </span>
-              </div>
+              {connected && (
+                <div className="ml-4 items-center hidden sm:flex" title="Real-time updates active">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-4">
-              <div className="hidden md:flex items-center space-x-4">
-                <Link
-                  href="/notifications"
-                  className={`text-sm font-medium ${pathname === '/notifications'
-                      ? 'text-primary'
-                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                    }`}
-                >
-                  Notifications
-                </Link>
-                <Link
-                  href="/certificates"
-                  className={`text-sm font-medium ${pathname === '/certificates'
-                      ? 'text-primary'
-                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                    }`}
-                >
-                  Certificates
-                </Link>
-                <Link
-                  href="/status-pages"
-                  className={`text-sm font-medium ${pathname === '/status-pages' || pathname.startsWith('/status-pages/')
-                      ? 'text-primary'
-                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                    }`}
-                >
-                  Status Pages
-                </Link>
-                <Link
-                  href="/settings"
-                  className={`text-sm font-medium ${pathname === '/settings'
-                      ? 'text-primary'
-                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                    }`}
-                >
-                  Settings
-                </Link>
-              </div>
+              <nav className="hidden md:flex items-center space-x-4">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      "text-sm font-medium transition-colors",
+                      link.isActive
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
               <ThemeToggle />
               <div className="hidden md:flex items-center space-x-4">
-                <span className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="text-sm text-muted-foreground">
                   {user?.username}
                 </span>
-                <button
-                  onClick={handleLogout}
-                  className="rounded-md bg-gray-200 dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                >
+                <Button variant="secondary" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
                   Logout
-                </button>
+                </Button>
               </div>
-              {/* Mobile Logout (Icon only) */}
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
                 onClick={handleLogout}
-                className="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                 title="Logout"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
+                <LogOut className="h-5 w-5" />
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Layout with Sidebar */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
         <MonitorSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        {/* Main Content */}
         <main className="flex-1 overflow-y-auto w-full">
           <div className="px-4 sm:px-6 lg:px-8 py-8">
             {children}

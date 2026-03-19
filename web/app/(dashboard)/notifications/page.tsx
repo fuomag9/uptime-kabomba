@@ -5,6 +5,21 @@ import { useRouter } from 'next/navigation';
 import { apiClient, Notification, NotificationProvider } from '@/lib/api';
 import NotificationList from '@/components/notifications/NotificationList';
 import NotificationForm from '@/components/notifications/NotificationForm';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -14,6 +29,7 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingNotification, setEditingNotification] = useState<Notification | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -41,26 +57,33 @@ export default function NotificationsPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Are you sure you want to delete this notification?')) {
-      return;
-    }
-
     try {
       await apiClient.deleteNotification(id);
       setNotifications((notifications || []).filter((n) => n.id !== id));
     } catch (err: any) {
       console.error('Failed to delete notification:', err);
-      alert('Failed to delete notification: ' + (err.message || 'Unknown error'));
+      toast.error('Failed to delete notification: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  function handleDeleteRequest(id: number) {
+    setDeleteId(id);
+  }
+
+  function handleDeleteConfirm() {
+    if (deleteId !== null) {
+      handleDelete(deleteId);
+      setDeleteId(null);
     }
   }
 
   async function handleTest(id: number) {
     try {
       const result = await apiClient.testNotification(id);
-      alert(result.message);
+      toast.success(result.message);
     } catch (err: any) {
       console.error('Failed to test notification:', err);
-      alert('Failed to test notification: ' + (err.message || 'Unknown error'));
+      toast.error('Failed to test notification: ' + (err.message || 'Unknown error'));
     }
   }
 
@@ -87,17 +110,28 @@ export default function NotificationsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Loading notifications...</div>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <Skeleton className="h-8 w-40" />
+            <Skeleton className="mt-2 h-4 w-64" />
+          </div>
+          <Skeleton className="h-8 w-36" />
+        </div>
+        <div className="grid gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
-        {error}
-      </div>
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
     );
   }
 
@@ -105,17 +139,14 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Notifications</h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <h1 className="text-2xl font-bold">Notifications</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage notification channels for monitor alerts
           </p>
         </div>
-        <button
-          onClick={handleCreate}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-        >
+        <Button onClick={handleCreate}>
           Add Notification
-        </button>
+        </Button>
       </div>
 
       {showForm && (
@@ -128,23 +159,43 @@ export default function NotificationsPage() {
       )}
 
       {(!notifications || notifications.length === 0) ? (
-        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
-          <p className="text-gray-600 dark:text-gray-400">No notifications configured yet.</p>
-          <button
-            onClick={handleCreate}
-            className="mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
-          >
-            Create your first notification
-          </button>
-        </div>
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-muted-foreground">No notifications configured yet.</p>
+            <Button
+              variant="link"
+              onClick={handleCreate}
+              className="mt-4"
+            >
+              Create your first notification
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <NotificationList
           notifications={notifications}
           onEdit={handleEdit}
-          onDelete={handleDelete}
+          onDelete={handleDeleteRequest}
           onTest={handleTest}
         />
       )}
+
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this notification? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
