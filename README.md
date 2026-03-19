@@ -1,6 +1,13 @@
 # Uptime Kabomba - Modern Uptime Monitoring
 
-A fast, type-safe, and production-ready uptime monitoring solution built with **Go** (backend) and **Next.js 15** (frontend).
+A fast, type-safe, and production-ready uptime monitoring solution built with **Go** (backend) and **Next.js 16** (frontend) with **shadcn/ui**, **Tailwind CSS v4**, and **Bun**.
+
+## Screenshots
+
+| Dark Mode | Light Mode |
+|-----------|------------|
+| ![Dashboard Dark](docs/screenshots/dashboard-dark.png) | ![Dashboard Light](docs/screenshots/dashboard-light.png) |
+| ![Monitor Detail Dark](docs/screenshots/monitor-detail-dark.png) | ![Login Light](docs/screenshots/login-light.png) |
 
 ## Features
 
@@ -62,7 +69,7 @@ open http://localhost:3000
 ```
 
 The system runs two services:
-- **Frontend**: Next.js server on port 3000 (publicly accessible)
+- **Frontend**: Next.js 16 server on port 3000 (publicly accessible)
 - **Backend**: Go API server (only accessible via Docker internal network)
 
 **Architecture**: The backend is NOT exposed to the host - all API requests are proxied through the Next.js frontend. This ensures the backend is never directly accessible to users, improving security.
@@ -89,7 +96,7 @@ docker-compose down -v
 
 **Prerequisites:**
 - Go 1.23+
-- Node.js 20+
+- Bun 1.x+ (or Node.js 20+)
 - PostgreSQL
 
 **Backend:**
@@ -116,9 +123,9 @@ go build -o bin/uptime-kabomba-server ./cmd/server
 **Frontend:**
 ```bash
 cd web
-npm install
-npm run build
-npm start
+bun install
+bun run build
+bun run start
 ```
 
 ## Configuration
@@ -403,10 +410,6 @@ uptime-kabomba/
 ```bash
 # Backend tests
 go test ./...
-
-# Frontend tests
-cd web
-npm test
 ```
 
 ### Building for Production
@@ -417,7 +420,8 @@ CGO_ENABLED=1 go build -a -installsuffix cgo -o uptime-kabomba-server ./cmd/serv
 
 # Frontend
 cd web
-npm run build
+bun install
+bun run build
 ```
 
 ## License

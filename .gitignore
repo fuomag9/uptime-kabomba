@@ -38,3 +38,4 @@ extra/exe-builder/obj
 /web/node_modules/
 /bin
 /.playwright-mcp
+web/tsconfig.tsbuildinfo
