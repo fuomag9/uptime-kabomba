@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -199,13 +200,23 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use configured allowed origins (same as CORS)
+	// nhooyr.io/websocket matches OriginPatterns against the host only,
+	// so we need to extract hosts from full URLs.
 	allowedOrigins := h.allowedOrigins
 	if len(allowedOrigins) == 0 {
 		allowedOrigins = []string{"http://localhost:3000"}
 	}
+	originHosts := make([]string, 0, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		if u, err := url.Parse(origin); err == nil && u.Host != "" {
+			originHosts = append(originHosts, u.Host)
+		} else {
+			originHosts = append(originHosts, origin)
+		}
+	}
 
 	acceptOptions := &websocket.AcceptOptions{
-		OriginPatterns: allowedOrigins,
+		OriginPatterns: originHosts,
 	}
 	if authHeader == "" && token != "" {
 		acceptOptions.Subprotocols = []string{token}
