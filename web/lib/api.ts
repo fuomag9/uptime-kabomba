@@ -408,6 +408,16 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Page Change Snapshots
+  async getMonitorSnapshots(monitorId: number, limit?: number): Promise<PageChangeSnapshot[]> {
+    const params = limit ? `?limit=${limit}` : '';
+    return this.request<PageChangeSnapshot[]>(`/api/monitors/${monitorId}/snapshots${params}`);
+  }
+
+  getScreenshotUrl(monitorId: number, snapshotId: number, type: 'screenshot' | 'diff' | 'baseline'): string {
+    return `${this.baseUrl}/api/monitors/${monitorId}/snapshots/${snapshotId}/${type}`;
+  }
 }
 
 // Monitor types
@@ -470,6 +480,23 @@ export interface UpdateCertificateRequest {
 
 export interface MonitorNotificationLink {
   notification_ids: number[];
+}
+
+export interface PageChangeSnapshot {
+  id: number;
+  monitor_id: number;
+  heartbeat_id: number | null;
+  screenshot_path: string;
+  baseline_path: string;
+  diff_path: string;
+  html_hash: string;
+  runtime_metrics: string;
+  change_score: number;
+  image_score: number;
+  html_score: number;
+  runtime_score: number;
+  is_baseline: boolean;
+  created_at: string;
 }
 
 export interface Heartbeat {

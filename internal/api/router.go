@@ -116,6 +116,12 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 			r.Get("/monitors/{id}/uptime/hourly", HandleGetMonitorHourlyUptime(db))
 			r.Get("/monitors/uptime/all", HandleGetAllMonitorsUptime(db))
 
+			// Page change snapshot routes
+			r.Get("/monitors/{id}/snapshots", HandleGetSnapshots(db))
+			r.Get("/monitors/{id}/snapshots/{snapshotId}/screenshot", HandleGetScreenshot(db, cfg.ScreenshotStoragePath))
+			r.Get("/monitors/{id}/snapshots/{snapshotId}/diff", HandleGetScreenshotDiff(db, cfg.ScreenshotStoragePath))
+			r.Get("/monitors/{id}/snapshots/{snapshotId}/baseline", HandleGetScreenshotBaseline(db, cfg.ScreenshotStoragePath))
+
 			// Notification routes
 			r.Get("/notifications", HandleGetNotificationsV2(db))
 			r.Post("/notifications", HandleCreateNotification(db))

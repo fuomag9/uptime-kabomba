@@ -19,10 +19,13 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o uptime-kabomba-se
 # Runtime stage
 FROM alpine:latest
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata
+# Install runtime dependencies (chromium for page_change monitor)
+RUN apk --no-cache add ca-certificates tzdata chromium
 
 WORKDIR /app
+
+# Create screenshot storage directory
+RUN mkdir -p /app/data/screenshots
 
 # Copy binary from builder
 COPY --from=backend-builder /app/uptime-kabomba-server .
@@ -38,7 +41,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider --header "X-Health-Token: ${HEALTH_TOKEN}" http://localhost:8080/health || exit 1
 
 # Set environment variables
-ENV DATABASE_TYPE=postgres \
+ENV CHROME_PATH=/usr/bin/chromium-browser \
+    SCREENSHOT_STORAGE_PATH=/app/data/screenshots \
+    DATABASE_TYPE=postgres \
     POSTGRES_HOST=postgres \
     POSTGRES_PORT=5432 \
     POSTGRES_DB=uptime \

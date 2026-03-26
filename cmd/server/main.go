@@ -58,6 +58,25 @@ func main() {
 	// Register HTTP monitor with mTLS cert loader
 	monitor.RegisterMonitorType(monitor.NewHTTPMonitor(monitor.NewDBCertLoader(db)))
 
+	// Register page change monitor with Chrome pool (optional)
+	if cfg.ChromeEnabled {
+		if monitor.Available(cfg.ChromePath) {
+			chromePool, err := monitor.NewChromePool(cfg.ChromePath, 5)
+			if err != nil {
+				log.Printf("WARNING: Chrome pool initialization failed: %v", err)
+				log.Println("page_change monitor type will be unavailable")
+			} else {
+				monitor.RegisterMonitorType(monitor.NewPageChangeMonitor(chromePool, db, cfg.ScreenshotStoragePath))
+				defer chromePool.Close()
+				log.Println("page_change monitor type registered successfully")
+			}
+		} else {
+			log.Println("Chrome/Chromium not found. page_change monitor type will be unavailable")
+		}
+	} else {
+		log.Println("Chrome is disabled. page_change monitor type will be unavailable")
+	}
+
 	// Initialize monitor executor
 	executor := monitor.NewExecutor(db, hub, dispatcher)
 	if err := executor.Start(); err != nil {
@@ -66,7 +85,7 @@ func main() {
 	defer executor.Stop()
 
 	// Initialize job scheduler
-	scheduler := jobs.NewScheduler(db)
+	scheduler := jobs.NewScheduler(db, cfg.ScreenshotStoragePath)
 	scheduler.Start()
 
 	// Start OAuth cleanup job if OAuth is enabled

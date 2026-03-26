@@ -23,6 +23,9 @@ type Config struct {
 	AllowMetadataEndpoints bool
 	MetricsToken           string
 	HealthToken            string
+	ScreenshotStoragePath  string
+	ChromePath             string
+	ChromeEnabled          bool
 }
 
 // DatabaseConfig holds database configuration
@@ -65,6 +68,9 @@ func Load() *Config {
 		AllowMetadataEndpoints: getEnvBool("ALLOW_METADATA_ENDPOINTS", false),
 		MetricsToken:           getEnv("METRICS_TOKEN", ""),
 		HealthToken:            getEnv("HEALTH_TOKEN", ""),
+		ScreenshotStoragePath:  getEnv("SCREENSHOT_STORAGE_PATH", "./data/screenshots"),
+		ChromePath:             getEnv("CHROME_PATH", ""),
+		ChromeEnabled:          getEnvBool("CHROME_ENABLED", true),
 	}
 
 	// Validate configuration

@@ -41,10 +41,15 @@ services:
       # Set to true to allow monitoring cloud metadata endpoints (169.254.169.254, etc.)
       # WARNING: This is dangerous in cloud environments. Only enable if absolutely necessary.
       - ALLOW_METADATA_ENDPOINTS=${ALLOW_METADATA_ENDPOINTS:-false}
+      # Page change monitor configuration (headless Chrome for screenshot-based change detection)
+      - SCREENSHOT_STORAGE_PATH=/app/data/screenshots
+      - CHROME_ENABLED=${CHROME_ENABLED:-true}
     # Grant CAP_NET_RAW capability for ICMP ping (raw sockets)
     # This allows ping to work without running as root
     cap_add:
       - NET_RAW
+    volumes:
+      - screenshot-data:/app/data/screenshots
     restart: unless-stopped
     depends_on:
       - postgres
@@ -74,4 +79,6 @@ services:
 
 volumes:
   postgres-data:
+    driver: local
+  screenshot-data:
     driver: local

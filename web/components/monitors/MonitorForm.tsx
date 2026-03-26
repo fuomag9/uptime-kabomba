@@ -31,6 +31,7 @@ const MONITOR_TYPES = [
   { value: 'ping', label: 'Ping (ICMP)', urlLabel: 'Host', urlPlaceholder: 'example.com or 192.168.1.1' },
   { value: 'dns', label: 'DNS', urlLabel: 'Hostname', urlPlaceholder: 'example.com' },
   { value: 'docker', label: 'Docker Container', urlLabel: 'Container Name/ID', urlPlaceholder: 'my-container' },
+  { value: 'page_change', label: 'Page Change', urlLabel: 'URL', urlPlaceholder: 'https://example.com' },
 ];
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
@@ -111,6 +112,24 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
   // Docker config
   const [dockerConfig, setDockerConfig] = useState({
     docker_host: (initialData?.config?.docker_host as string) || '',
+  });
+
+  // Page Change config
+  const [pageChangeConfig, setPageChangeConfig] = useState({
+    change_threshold: ((initialData?.config?.change_threshold as number) ?? 0.1) * 100,
+    wait_time: (initialData?.config?.wait_time as number) || 3000,
+    viewport_width: (initialData?.config?.viewport_width as number) || 1920,
+    viewport_height: (initialData?.config?.viewport_height as number) || 1080,
+    watch_selectors: Array.isArray(initialData?.config?.watch_selectors)
+      ? (initialData.config.watch_selectors as string[]).join('\n')
+      : (initialData?.config?.watch_selectors as string) || '',
+    ignore_selectors: Array.isArray(initialData?.config?.ignore_selectors)
+      ? (initialData.config.ignore_selectors as string[]).join('\n')
+      : (initialData?.config?.ignore_selectors as string) || '',
+    custom_js: (initialData?.config?.custom_js as string) || '',
+    image_weight: ((initialData?.config?.image_weight as number) ?? 0.4) * 100,
+    html_weight: ((initialData?.config?.html_weight as number) ?? 0.3) * 100,
+    runtime_weight: ((initialData?.config?.runtime_weight as number) ?? 0.3) * 100,
   });
 
   // Load notifications on mount
@@ -195,6 +214,25 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
     } else if (formData.type === 'docker') {
       if (dockerConfig.docker_host) {
         config.docker_host = dockerConfig.docker_host;
+      }
+    } else if (formData.type === 'page_change') {
+      config.change_threshold = pageChangeConfig.change_threshold / 100;
+      config.wait_time = pageChangeConfig.wait_time;
+      config.viewport_width = pageChangeConfig.viewport_width;
+      config.viewport_height = pageChangeConfig.viewport_height;
+      config.image_weight = pageChangeConfig.image_weight / 100;
+      config.html_weight = pageChangeConfig.html_weight / 100;
+      config.runtime_weight = pageChangeConfig.runtime_weight / 100;
+      const watchSels = pageChangeConfig.watch_selectors.split('\n').map(s => s.trim()).filter(Boolean);
+      if (watchSels.length > 0) {
+        config.watch_selectors = watchSels;
+      }
+      const ignoreSels = pageChangeConfig.ignore_selectors.split('\n').map(s => s.trim()).filter(Boolean);
+      if (ignoreSels.length > 0) {
+        config.ignore_selectors = ignoreSels;
+      }
+      if (pageChangeConfig.custom_js.trim()) {
+        config.custom_js = pageChangeConfig.custom_js;
       }
     }
 
@@ -834,6 +872,189 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
                 Docker daemon socket (leave empty for default local socket)
               </p>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* Page Change-specific configuration */}
+      {formData.type === 'page_change' && (
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Page Change Configuration</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Detects visual and content changes using headless Chrome. Requires Chrome/Chromium on the server.
+            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="changeThreshold">
+                Change Threshold (%)
+              </Label>
+              <Input
+                type="number"
+                id="changeThreshold"
+                value={pageChangeConfig.change_threshold}
+                onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, change_threshold: parseFloat(e.target.value) })}
+                min={0}
+                max={100}
+                step={1}
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Alert when the combined change score exceeds this percentage (default: 10%)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="waitTime">
+                Wait Time (ms)
+              </Label>
+              <Input
+                type="number"
+                id="waitTime"
+                value={pageChangeConfig.wait_time}
+                onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, wait_time: parseInt(e.target.value) })}
+                min={0}
+                max={30000}
+                step={500}
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Milliseconds to wait after page load before capturing (for JS-heavy pages)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="viewportWidth">
+                  Viewport Width
+                </Label>
+                <Input
+                  type="number"
+                  id="viewportWidth"
+                  value={pageChangeConfig.viewport_width}
+                  onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, viewport_width: parseInt(e.target.value) })}
+                  min={320}
+                  max={3840}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="viewportHeight">
+                  Viewport Height
+                </Label>
+                <Input
+                  type="number"
+                  id="viewportHeight"
+                  value={pageChangeConfig.viewport_height}
+                  onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, viewport_height: parseInt(e.target.value) })}
+                  min={240}
+                  max={2160}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="watchSelectors">
+                CSS Selectors to Watch (optional)
+              </Label>
+              <Textarea
+                id="watchSelectors"
+                value={pageChangeConfig.watch_selectors}
+                onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, watch_selectors: e.target.value })}
+                rows={3}
+                placeholder={"#main-content\n.price-tag\nheader nav"}
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                One CSS selector per line. The runtime analysis will check if these elements exist.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ignoreSelectors">
+                CSS Selectors to Ignore (optional)
+              </Label>
+              <Textarea
+                id="ignoreSelectors"
+                value={pageChangeConfig.ignore_selectors}
+                onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, ignore_selectors: e.target.value })}
+                rows={3}
+                placeholder={".ads\n.cookie-banner\n#dynamic-timestamp"}
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                One CSS selector per line. These elements will be hidden before taking screenshots.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="customJs">
+                Custom JavaScript (optional)
+              </Label>
+              <Textarea
+                id="customJs"
+                value={pageChangeConfig.custom_js}
+                onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, custom_js: e.target.value })}
+                rows={4}
+                className="font-mono text-sm"
+                placeholder="return document.querySelector('.status').textContent;"
+              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                JavaScript to execute on the page. The return value is captured in runtime metrics.
+              </p>
+            </div>
+
+            <Separator />
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Heuristic Weights</h4>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              How much each detection method contributes to the change score. Must sum to 100%.
+            </p>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="imageWeight">
+                  Image (%)
+                </Label>
+                <Input
+                  type="number"
+                  id="imageWeight"
+                  value={pageChangeConfig.image_weight}
+                  onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, image_weight: parseFloat(e.target.value) })}
+                  min={0}
+                  max={100}
+                  step={5}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="htmlWeight">
+                  HTML (%)
+                </Label>
+                <Input
+                  type="number"
+                  id="htmlWeight"
+                  value={pageChangeConfig.html_weight}
+                  onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, html_weight: parseFloat(e.target.value) })}
+                  min={0}
+                  max={100}
+                  step={5}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="runtimeWeight">
+                  Runtime (%)
+                </Label>
+                <Input
+                  type="number"
+                  id="runtimeWeight"
+                  value={pageChangeConfig.runtime_weight}
+                  onChange={(e) => setPageChangeConfig({ ...pageChangeConfig, runtime_weight: parseFloat(e.target.value) })}
+                  min={0}
+                  max={100}
+                  step={5}
+                />
+              </div>
+            </div>
+            {Math.abs(pageChangeConfig.image_weight + pageChangeConfig.html_weight + pageChangeConfig.runtime_weight - 100) > 1 && (
+              <p className="text-sm text-red-600 dark:text-red-400">
+                Weights must sum to 100% (currently {pageChangeConfig.image_weight + pageChangeConfig.html_weight + pageChangeConfig.runtime_weight}%)
+              </p>
+            )}
           </div>
         </>
       )}
