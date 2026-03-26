@@ -130,6 +130,7 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
     image_weight: ((initialData?.config?.image_weight as number) ?? 0.4) * 100,
     html_weight: ((initialData?.config?.html_weight as number) ?? 0.3) * 100,
     runtime_weight: ((initialData?.config?.runtime_weight as number) ?? 0.3) * 100,
+    auto_accept_changes: (initialData?.config?.auto_accept_changes as boolean) ?? true,
   });
 
   // Load notifications on mount
@@ -223,6 +224,7 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
       config.image_weight = pageChangeConfig.image_weight / 100;
       config.html_weight = pageChangeConfig.html_weight / 100;
       config.runtime_weight = pageChangeConfig.runtime_weight / 100;
+      config.auto_accept_changes = pageChangeConfig.auto_accept_changes;
       const watchSels = pageChangeConfig.watch_selectors.split('\n').map(s => s.trim()).filter(Boolean);
       if (watchSels.length > 0) {
         config.watch_selectors = watchSels;
@@ -902,6 +904,25 @@ export default function MonitorForm({ initialData, monitorId, notificationsConfi
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Alert when the combined change score exceeds this percentage (default: 10%)
               </p>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <Checkbox
+                id="autoAcceptChanges"
+                checked={pageChangeConfig.auto_accept_changes}
+                onCheckedChange={(checked) => setPageChangeConfig({ ...pageChangeConfig, auto_accept_changes: checked === true })}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <Label htmlFor="autoAcceptChanges" className="text-sm font-medium text-blue-900 dark:text-blue-100 cursor-pointer">
+                  Auto-accept changes after notification
+                </Label>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  {pageChangeConfig.auto_accept_changes
+                    ? "When a change is detected, one DOWN notification is sent, then the new page becomes the baseline. The monitor recovers to UP and will alert again only on the next change."
+                    : "When a change is detected, the monitor stays DOWN until the page reverts to the original. Use this to monitor pages that should never change (e.g. legal pages, compliance docs)."}
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2">

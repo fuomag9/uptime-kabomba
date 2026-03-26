@@ -298,24 +298,63 @@ func (p *PageChangeMonitor) Check(ctx context.Context, monitor *Monitor) (*Heart
 	}
 	p.db.Create(&snapshot)
 
-	// If page is stable (below threshold), rotate baseline
-	if changeScore < changeThreshold {
-		p.db.Model(&PageChangeSnapshot{}).
-			Where("monitor_id = ? AND is_baseline = ?", monitor.ID, true).
-			Update("is_baseline", false)
+	autoAccept := getConfigBool(monitor, "auto_accept_changes", true)
 
-		snapshot.IsBaseline = true
-		p.db.Model(&snapshot).Update("is_baseline", true)
+	// Rotate baseline logic:
+	// - Below threshold: always rotate (page is stable, track gradual drift)
+	// - Above threshold + auto_accept=true: notify DOWN once, then accept as new baseline
+	//   so the monitor recovers to UP and only fires again on the NEXT change
+	// - Above threshold + auto_accept=false: keep old baseline, stay DOWN until
+	//   page reverts or user manually resets (delete & recreate monitor)
+	if changeScore < changeThreshold {
+		// Stable - rotate baseline
+		p.rotateBaseline(monitor.ID, &snapshot, screenshotAbsPath, htmlContent)
 
 		heartbeat.Status = StatusUp
 		heartbeat.Message = fmt.Sprintf("No significant change (score: %.2f) - %dms", changeScore, ping)
+	} else if autoAccept {
+		// Changed + auto-accept: check if this is the first detection or a repeat.
+		// On first detection: report DOWN (triggers notification).
+		// On subsequent checks with same content: accept as new baseline, report UP.
+		// We detect "repeat" by checking if previous snapshot had the same HTML hash.
+		var prevSnapshot PageChangeSnapshot
+		prevErr := p.db.Where("monitor_id = ? AND id < ? AND is_baseline = ?", monitor.ID, snapshot.ID, false).
+			Order("created_at DESC").
+			First(&prevSnapshot).Error
+
+		if prevErr == nil && prevSnapshot.HTMLHash == htmlHash && prevSnapshot.ChangeScore >= changeThreshold {
+			// Same changed content seen before - accept as new baseline
+			p.rotateBaseline(monitor.ID, &snapshot, screenshotAbsPath, htmlContent)
+
+			heartbeat.Status = StatusUp
+			heartbeat.Message = fmt.Sprintf("Change accepted as new baseline (score: %.2f) - %dms", changeScore, ping)
+		} else {
+			// First detection of this change - report DOWN to trigger notification
+			heartbeat.Status = StatusDown
+			heartbeat.Message = fmt.Sprintf("Page changed (score: %.2f, threshold: %.2f) - Image: %.2f, HTML: %.2f, Runtime: %.2f - %dms",
+				changeScore, changeThreshold, imageScore, htmlScore, runtimeScore, ping)
+		}
 	} else {
+		// Changed + no auto-accept: stay DOWN until page reverts
 		heartbeat.Status = StatusDown
 		heartbeat.Message = fmt.Sprintf("Page changed (score: %.2f, threshold: %.2f) - Image: %.2f, HTML: %.2f, Runtime: %.2f - %dms",
 			changeScore, changeThreshold, imageScore, htmlScore, runtimeScore, ping)
 	}
 
 	return heartbeat, nil
+}
+
+// rotateBaseline marks the given snapshot as the new baseline and demotes the old one.
+func (p *PageChangeMonitor) rotateBaseline(monitorID int, snapshot *PageChangeSnapshot, screenshotAbsPath, htmlContent string) {
+	p.db.Model(&PageChangeSnapshot{}).
+		Where("monitor_id = ? AND is_baseline = ?", monitorID, true).
+		Update("is_baseline", false)
+
+	snapshot.IsBaseline = true
+	p.db.Model(snapshot).Update("is_baseline", true)
+
+	// Save HTML alongside new baseline for future granular comparison
+	os.WriteFile(screenshotAbsPath+".html", []byte(htmlContent), 0644)
 }
 
 // capturePage uses Chrome to navigate to a URL and capture screenshot, HTML, and runtime metrics.
