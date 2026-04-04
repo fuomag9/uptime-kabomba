@@ -86,15 +86,14 @@ func (a *StatsAggregator) aggregateMonitorHourly(monitorID int, hourStart, hourE
 
 	// Insert or update hourly stat
 	upsertQuery := `
-		INSERT INTO stat_hourly (monitor_id, hour, ping_min, ping_max, ping_avg, up_count, down_count, total_count, uptime_percentage, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(monitor_id, hour) DO UPDATE SET
+		INSERT INTO stat_hourly (monitor_id, timestamp, ping_min, ping_max, ping_avg, up_count, down_count, uptime_percentage)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(monitor_id, timestamp) DO UPDATE SET
 			ping_min = EXCLUDED.ping_min,
 			ping_max = EXCLUDED.ping_max,
 			ping_avg = EXCLUDED.ping_avg,
 			up_count = EXCLUDED.up_count,
 			down_count = EXCLUDED.down_count,
-			total_count = EXCLUDED.total_count,
 			uptime_percentage = EXCLUDED.uptime_percentage
 	`
 
@@ -113,7 +112,7 @@ func (a *StatsAggregator) aggregateMonitorHourly(monitorID int, hourStart, hourE
 
 	err = a.db.Exec(upsertQuery,
 		monitorID, hourStart, pingMin, pingMax, pingAvg,
-		stats.UpCount, stats.DownCount, stats.TotalCount, uptimePercentage, time.Now(),
+		stats.UpCount, stats.DownCount, uptimePercentage,
 	).Error
 
 	return err
@@ -188,15 +187,14 @@ func (a *StatsAggregator) aggregateMonitorDaily(monitorID int, dayStart, dayEnd 
 
 	// Insert or update daily stat
 	upsertQuery := `
-		INSERT INTO stat_daily (monitor_id, date, ping_min, ping_max, ping_avg, up_count, down_count, total_count, uptime_percentage, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(monitor_id, date) DO UPDATE SET
+		INSERT INTO stat_daily (monitor_id, timestamp, ping_min, ping_max, ping_avg, up_count, down_count, uptime_percentage)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(monitor_id, timestamp) DO UPDATE SET
 			ping_min = EXCLUDED.ping_min,
 			ping_max = EXCLUDED.ping_max,
 			ping_avg = EXCLUDED.ping_avg,
 			up_count = EXCLUDED.up_count,
 			down_count = EXCLUDED.down_count,
-			total_count = EXCLUDED.total_count,
 			uptime_percentage = EXCLUDED.uptime_percentage
 	`
 
@@ -214,8 +212,8 @@ func (a *StatsAggregator) aggregateMonitorDaily(monitorID int, dayStart, dayEnd 
 	}
 
 	err = a.db.Exec(upsertQuery,
-		monitorID, dayStart.Format("2006-01-02"), pingMin, pingMax, pingAvg,
-		stats.UpCount, stats.DownCount, stats.TotalCount, uptimePercentage, time.Now(),
+		monitorID, dayStart, pingMin, pingMax, pingAvg,
+		stats.UpCount, stats.DownCount, uptimePercentage,
 	).Error
 
 	return err
