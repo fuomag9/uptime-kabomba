@@ -101,6 +101,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 			// Settings routes
 			r.Get("/settings", HandleGetUserSettings(db))
 			r.Put("/settings", HandleUpdateUserSettings(db))
+			r.Post("/user/change-password", HandleChangePassword(db))
 
 			// Monitor routes
 			r.Get("/monitors", HandleGetMonitors(db))

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	"github.com/fuomag9/uptime-kabomba/internal/models"
@@ -34,6 +35,64 @@ func HandleGetUserSettings(db *gorm.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(settings)
+	}
+}
+
+// ChangePasswordRequest represents the request body for changing password
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// HandleChangePassword changes the current user's password
+func HandleChangePassword(db *gorm.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := r.Context().Value(userContextKey).(*models.User)
+
+		var req ChangePasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if req.CurrentPassword == "" || req.NewPassword == "" {
+			http.Error(w, "Current password and new password are required", http.StatusBadRequest)
+			return
+		}
+
+		if len(req.NewPassword) < 8 {
+			http.Error(w, "New password must be at least 8 characters", http.StatusBadRequest)
+			return
+		}
+
+		// Reload user to get password hash (it's excluded from JSON)
+		var dbUser models.User
+		if err := db.First(&dbUser, user.ID).Error; err != nil {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+
+		// Verify current password
+		if err := bcrypt.CompareHashAndPassword([]byte(dbUser.Password), []byte(req.CurrentPassword)); err != nil {
+			http.Error(w, "Current password is incorrect", http.StatusUnauthorized)
+			return
+		}
+
+		// Hash new password
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+			return
+		}
+
+		// Update password
+		if err := db.Model(&dbUser).Update("password", string(hashedPassword)).Error; err != nil {
+			http.Error(w, "Failed to update password", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Password changed successfully"})
 	}
 }
 
