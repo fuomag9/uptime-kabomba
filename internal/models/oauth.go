@@ -10,7 +10,7 @@ type OAuthLinkingToken struct {
 	Provider  string    `json:"provider" gorm:"not null"`
 	Subject   string    `json:"subject" gorm:"not null"`
 	Email     string    `json:"email" gorm:"not null"`
-	OAuthData *string   `json:"oauth_data"`
+	OAuthData *string   `json:"oauth_data" gorm:"column:oauth_data"`
 	ExpiresAt time.Time `json:"expires_at" gorm:"not null"`
 	CreatedAt time.Time `json:"created_at"`
 }
