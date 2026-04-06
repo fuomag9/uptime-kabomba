@@ -86,8 +86,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 		// OAuth routes (if enabled)
 		if oauthClient != nil {
 			r.Get("/auth/oauth/config", HandleGetOAuthConfig(cfg))
-			r.With(StrictRateLimitMiddleware(authLimiter)).Get("/auth/oauth/authorize", HandleOAuthAuthorize(db, cfg, oauthClient))
-			r.With(StrictRateLimitMiddleware(authLimiter)).Get("/auth/oauth/callback", HandleOAuthCallback(db, cfg, oauthClient))
+			r.Get("/auth/oauth/authorize", HandleOAuthAuthorize(db, cfg, oauthClient))
+			r.Get("/auth/oauth/callback", HandleOAuthCallback(db, cfg, oauthClient))
 			r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/oauth/link", HandleOAuthLinkAccount(db, cfg))
 		}
 
