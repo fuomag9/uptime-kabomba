@@ -38,8 +38,8 @@ updates:
           - "minor"
           - "patch"
 
-  # NPM dependencies updates (frontend)
-  - package-ecosystem: "npm"
+  # Bun dependencies updates (frontend)
+  - package-ecosystem: "bun"
     directory: "/web"
     schedule:
       interval: "weekly"
@@ -65,8 +65,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    # Security updates always get their own PR
-    versioning-strategy: increase
 
   # Docker base images updates (backend)
   - package-ecosystem: "docker"
