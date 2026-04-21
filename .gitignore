@@ -39,3 +39,4 @@ extra/exe-builder/obj
 /bin
 /.playwright-mcp
 web/tsconfig.tsbuildinfo
+main
