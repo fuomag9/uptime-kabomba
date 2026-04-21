@@ -55,14 +55,15 @@ func HandleGetMonitors(db *gorm.DB) http.HandlerFunc {
 		if len(monitorIDs) > 0 {
 			var latest []models.Heartbeat
 			db.Raw(`
-				SELECT h.*
-				FROM heartbeats h
-				INNER JOIN (
-					SELECT monitor_id, MAX(time) as max_time
+				SELECT hb.*
+				FROM UNNEST(?::int[]) AS ids(monitor_id)
+				JOIN LATERAL (
+					SELECT *
 					FROM heartbeats
-					WHERE monitor_id = ANY(?::int[])
-					GROUP BY monitor_id
-				) latest_hb ON h.monitor_id = latest_hb.monitor_id AND h.time = latest_hb.max_time
+					WHERE monitor_id = ids.monitor_id
+					ORDER BY time DESC, id DESC
+					LIMIT 1
+				) hb ON true
 			`, monitorIDs).Scan(&latest)
 
 			latestByMonitor := make(map[int]models.Heartbeat, len(latest))
