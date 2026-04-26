@@ -398,15 +398,10 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 		if len(monitorIDs) > 0 {
 			var latest []models.Heartbeat
 			db.Raw(`
-				SELECT hb.*
-				FROM UNNEST(?::int[]) AS ids(monitor_id)
-				JOIN LATERAL (
-					SELECT *
-					FROM heartbeats
-					WHERE monitor_id = ids.monitor_id
-					ORDER BY time DESC, id DESC
-					LIMIT 1
-				) hb ON true
+				SELECT DISTINCT ON (monitor_id) *
+				FROM heartbeats
+				WHERE monitor_id IN ?
+				ORDER BY monitor_id, time DESC, id DESC
 			`, monitorIDs).Scan(&latest)
 
 			latestByMonitor := make(map[int]models.Heartbeat, len(latest))
@@ -489,15 +484,10 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 			}
 			var lastStatusRows []lastStatusRow
 			db.Raw(`
-				SELECT ids.monitor_id, hb.status
-				FROM UNNEST(?::int[]) AS ids(monitor_id)
-				JOIN LATERAL (
-					SELECT status
-					FROM heartbeats
-					WHERE monitor_id = ids.monitor_id AND time < ?
-					ORDER BY time DESC, id DESC
-					LIMIT 1
-				) hb ON true
+				SELECT DISTINCT ON (monitor_id) monitor_id, status
+				FROM heartbeats
+				WHERE monitor_id IN ? AND time < ?
+				ORDER BY monitor_id, time DESC, id DESC
 			`, monitorIDs, start).Scan(&lastStatusRows)
 
 			lastStatusByMonitor := make(map[int]int, len(lastStatusRows))
