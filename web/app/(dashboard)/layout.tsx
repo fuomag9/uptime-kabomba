@@ -8,7 +8,6 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { MonitorSidebar } from '@/components/MonitorSidebar';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Menu, LogOut } from 'lucide-react';
 
@@ -20,30 +19,23 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const { connected } = useWebSocket();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = apiClient.getToken();
-        if (!token) {
-          router.push('/login');
-          return;
-        }
+    const token = apiClient.getToken();
+    if (!token) {
+      router.push('/login');
+      return;
+    }
 
-        const currentUser = await apiClient.getCurrentUser();
-        setUser(currentUser);
-      } catch (err) {
-        router.push('/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
+    // Token exists — render content immediately and fetch user info in the background.
+    // This avoids a sequential waterfall where the monitors query couldn't start
+    // until getCurrentUser() completed.
+    apiClient.getCurrentUser()
+      .then(setUser)
+      .catch(() => router.push('/login'));
   }, [router]);
 
   const handleLogout = async () => {
@@ -54,17 +46,6 @@ export default function DashboardLayout({
       console.error('Logout failed:', err);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-      </div>
-    );
-  }
 
   const navLinks = [
     { href: '/notifications', label: 'Notifications', isActive: pathname === '/notifications' },
