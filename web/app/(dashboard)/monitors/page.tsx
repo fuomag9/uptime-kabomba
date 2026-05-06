@@ -6,12 +6,13 @@ import Link from 'next/link';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, FileText } from 'lucide-react';
 
 export default function MonitorsPage() {
   // Connect to WebSocket for real-time updates
   useWebSocket();
-  const { data: monitors = [] } = useQuery({
+  const { data: monitors = [], isLoading } = useQuery({
     queryKey: ['monitors'],
     queryFn: () => apiClient.getMonitors(),
     refetchInterval: 30000,
@@ -45,7 +46,18 @@ export default function MonitorsPage() {
         </div>
       </div>
 
-      {totalMonitors > 0 ? (
+      {isLoading ? (
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent>
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : totalMonitors > 0 ? (
         <>
           {/* Stats Grid */}
           <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

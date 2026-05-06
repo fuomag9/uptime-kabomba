@@ -393,21 +393,19 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 			monitorIDs = append(monitorIDs, monitor.ID)
 		}
 
-		// Get latest heartbeat per monitor in one query
+		// Get latest heartbeat per monitor using individual indexed lookups
 		lastHeartbeatStatusByMonitor := make(map[int]int, len(monitorIDs))
 		if len(monitorIDs) > 0 {
-			var latest []models.Heartbeat
-			db.Raw(`
-				SELECT DISTINCT ON (monitor_id) *
-				FROM heartbeats
-				WHERE monitor_id IN ?
-				ORDER BY monitor_id, time DESC, id DESC
-			`, monitorIDs).Scan(&latest)
-
-			latestByMonitor := make(map[int]models.Heartbeat, len(latest))
-			for _, hb := range latest {
-				latestByMonitor[hb.MonitorID] = hb
-				lastHeartbeatStatusByMonitor[hb.MonitorID] = hb.Status
+			latestByMonitor := make(map[int]models.Heartbeat, len(monitorIDs))
+			for _, mid := range monitorIDs {
+				var hb models.Heartbeat
+				if err := db.Where("monitor_id = ?", mid).
+					Order("time DESC").
+					Limit(1).
+					First(&hb).Error; err == nil {
+					latestByMonitor[mid] = hb
+					lastHeartbeatStatusByMonitor[mid] = hb.Status
+				}
 			}
 
 			for i, monitor := range monitors {
@@ -482,17 +480,18 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 				MonitorID int `gorm:"column:monitor_id"`
 				Status    int `gorm:"column:status"`
 			}
-			var lastStatusRows []lastStatusRow
-			db.Raw(`
-				SELECT DISTINCT ON (monitor_id) monitor_id, status
-				FROM heartbeats
-				WHERE monitor_id IN ? AND time < ?
-				ORDER BY monitor_id, time DESC, id DESC
-			`, monitorIDs, start).Scan(&lastStatusRows)
-
-			lastStatusByMonitor := make(map[int]int, len(lastStatusRows))
-			for _, row := range lastStatusRows {
-				lastStatusByMonitor[row.MonitorID] = row.Status
+			lastStatusByMonitor := make(map[int]int, len(monitorIDs))
+			for _, mid := range monitorIDs {
+				var row lastStatusRow
+				if err := db.Raw(`
+					SELECT monitor_id, status
+					FROM heartbeats
+					WHERE monitor_id = ? AND time < ?
+					ORDER BY time DESC
+					LIMIT 1
+				`, mid, start).Scan(&row).Error; err == nil && row.MonitorID != 0 {
+					lastStatusByMonitor[mid] = row.Status
+				}
 			}
 
 			bucketStatusByMonitor := make(map[int]map[int]int, len(monitorIDs))

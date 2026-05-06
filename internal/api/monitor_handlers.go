@@ -53,17 +53,18 @@ func HandleGetMonitors(db *gorm.DB) http.HandlerFunc {
 		}
 
 		if len(monitorIDs) > 0 {
-			var latest []models.Heartbeat
-			db.Raw(`
-				SELECT DISTINCT ON (monitor_id) *
-				FROM heartbeats
-				WHERE monitor_id IN ?
-				ORDER BY monitor_id, time DESC, id DESC
-			`, monitorIDs).Scan(&latest)
-
-			latestByMonitor := make(map[int]models.Heartbeat, len(latest))
-			for _, hb := range latest {
-				latestByMonitor[hb.MonitorID] = hb
+			// Use individual indexed lookups instead of DISTINCT ON which
+			// can be slow on large heartbeats tables. Each query hits the
+			// (monitor_id, time DESC) index and returns instantly with LIMIT 1.
+			latestByMonitor := make(map[int]models.Heartbeat, len(monitorIDs))
+			for _, mid := range monitorIDs {
+				var hb models.Heartbeat
+				if err := db.Where("monitor_id = ?", mid).
+					Order("time DESC").
+					Limit(1).
+					First(&hb).Error; err == nil {
+					latestByMonitor[mid] = hb
+				}
 			}
 
 			for i, mon := range monitors {
