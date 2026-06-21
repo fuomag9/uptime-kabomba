@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -158,14 +159,8 @@ func HandleDeleteCertificate(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		// Check if any monitor references this certificate
-		var count int64
-		// Config is stored as JSONB; use an exact integer match to avoid false positives
-		if err := db.Raw(
-			`SELECT COUNT(*) FROM monitors WHERE user_id = ? AND (config::jsonb->>'certificate_id')::int = ?`,
-			user.ID,
-			id,
-		).Scan(&count).Error; err != nil {
+		count, err := countCertificateUsage(db, user.ID, id)
+		if err != nil {
 			http.Error(w, "Failed to check certificate usage", http.StatusInternalServerError)
 			return
 		}
@@ -185,5 +180,54 @@ func HandleDeleteCertificate(db *gorm.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func countCertificateUsage(db *gorm.DB, userID, certID int) (int64, error) {
+	var monitorConfigs []struct {
+		ConfigRaw string `gorm:"column:config"`
+	}
+	if err := db.Table("monitors").Select("config").Where("user_id = ?", userID).Find(&monitorConfigs).Error; err != nil {
+		return 0, err
+	}
+
+	var count int64
+	for _, monitorConfig := range monitorConfigs {
+		if monitorConfigReferencesCertificate(monitorConfig.ConfigRaw, certID) {
+			count++
+		}
+	}
+
+	return count, nil
+}
+
+func monitorConfigReferencesCertificate(configRaw string, certID int) bool {
+	if configRaw == "" {
+		return false
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal([]byte(configRaw), &config); err != nil {
+		return false
+	}
+
+	certIDRaw, ok := config["certificate_id"]
+	if !ok {
+		return false
+	}
+
+	switch v := certIDRaw.(type) {
+	case float64:
+		return v == float64(certID)
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(v))
+		return err == nil && parsed == certID
+	case int:
+		return v == certID
+	case json.Number:
+		parsed, err := strconv.Atoi(v.String())
+		return err == nil && parsed == certID
+	default:
+		return false
 	}
 }
