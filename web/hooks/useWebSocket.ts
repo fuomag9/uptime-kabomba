@@ -2,17 +2,15 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { wsClient, WebSocketMessage } from '@/lib/websocket';
-import { apiClient } from '@/lib/api';
 
 export function useWebSocket() {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const token = apiClient.getToken();
-
-    // Connect to WebSocket if not already connected
+    // Connect to WebSocket if not already connected. Auth is via the
+    // access_token cookie, sent automatically on the handshake.
     if (!wsClient.isConnected()) {
-      wsClient.connect(token || undefined);
+      wsClient.connect();
     }
 
     // Setup event listeners

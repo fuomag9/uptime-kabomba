@@ -28,6 +28,10 @@ func (t *TeamsProvider) Send(ctx context.Context, notification *Notification, me
 		return fmt.Errorf("webhook_url is required")
 	}
 
+	if err := validateOutboundURL(webhookURL); err != nil {
+		return err
+	}
+
 	// Determine theme color based on status
 	var themeColor string
 	switch message.Status {

@@ -6,6 +6,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/fuomag9/uptime-kabomba/internal/netsec"
 )
 
 // DNSMonitor performs DNS query checks
@@ -164,6 +166,22 @@ func (d *DNSMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, e
 func (d *DNSMonitor) Validate(monitor *Monitor) error {
 	if monitor.URL == "" {
 		return fmt.Errorf("hostname is required")
+	}
+
+	// SSRF protection - a custom dns_server is a network destination the
+	// server connects to directly (unlike the queried hostname, which only
+	// ever produces DNS answers, not a connection), so validate it the same
+	// way other monitor targets are validated.
+	if dnsServer, ok := monitor.Config["dns_server"].(string); ok && dnsServer != "" {
+		host := dnsServer
+		if h, _, err := net.SplitHostPort(dnsServer); err == nil {
+			host = h
+		}
+		cfg := GetConfig()
+		ssrfProtection := netsec.NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints)
+		if err := ssrfProtection.ValidateHost(host); err != nil {
+			return fmt.Errorf("dns_server validation failed: %w", err)
+		}
 	}
 
 	// Validate query type

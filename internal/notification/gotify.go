@@ -34,6 +34,10 @@ func (g *GotifyProvider) Send(ctx context.Context, notification *Notification, m
 		return fmt.Errorf("app_token is required")
 	}
 
+	if err := validateOutboundURL(serverURL); err != nil {
+		return err
+	}
+
 	// Default priority based on status
 	if priority == 0 {
 		if message.Status == "down" {

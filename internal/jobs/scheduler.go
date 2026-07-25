@@ -61,6 +61,12 @@ func (s *Scheduler) Start() {
 		s.cleanupOldSnapshots()
 	})
 
+	// Cleanup expired refresh/revoked-access token rows daily at 4:00 AM
+	s.cron.AddFunc("0 4 * * *", func() {
+		log.Println("Running auth token cleanup job...")
+		s.cleanupExpiredTokens()
+	})
+
 	s.cron.Start()
 	log.Println("Job scheduler started")
 }
@@ -268,5 +274,26 @@ func (s *Scheduler) cleanupOldSnapshots() {
 		log.Printf("Failed to delete old snapshot records: %v", result.Error)
 	} else {
 		log.Printf("Cleaned up %d snapshot records and %d files", result.RowsAffected, filesDeleted)
+	}
+}
+
+// cleanupExpiredTokens purges refresh_tokens and revoked_access_tokens rows
+// past their expiry. Both tables exist purely to enforce revocation before a
+// token's natural expiry - once expired, a token would be rejected anyway
+// (JWTs on their own "exp" claim, refresh tokens on their own expires_at),
+// so keeping the row around any longer only wastes space.
+func (s *Scheduler) cleanupExpiredTokens() {
+	refreshResult := s.db.Exec("DELETE FROM refresh_tokens WHERE expires_at < NOW()")
+	if refreshResult.Error != nil {
+		log.Printf("Failed to cleanup expired refresh tokens: %v", refreshResult.Error)
+	} else if refreshResult.RowsAffected > 0 {
+		log.Printf("Cleaned up %d expired refresh tokens", refreshResult.RowsAffected)
+	}
+
+	revokedResult := s.db.Exec("DELETE FROM revoked_access_tokens WHERE expires_at < NOW()")
+	if revokedResult.Error != nil {
+		log.Printf("Failed to cleanup expired revoked-access-token entries: %v", revokedResult.Error)
+	} else if revokedResult.RowsAffected > 0 {
+		log.Printf("Cleaned up %d expired revoked-access-token entries", revokedResult.RowsAffected)
 	}
 }

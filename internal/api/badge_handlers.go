@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"html"
 	"net/http"
 	"strconv"
 
@@ -211,9 +212,17 @@ func generateBadgeSVG(label, message, color string) string {
 		hexColor = colorMap["gray"]
 	}
 
-	labelWidth := len(label) * 6 + 10
-	messageWidth := len(message) * 6 + 10
+	// Compute layout from the raw (unescaped) text so glyph-count-based sizing
+	// stays accurate, but only ever write the XML-escaped versions into the
+	// SVG below - label/message can carry attacker-controlled query params
+	// (see the uptime badge's "period"), and this SVG is served publicly with
+	// no authentication.
+	labelWidth := len(label)*6 + 10
+	messageWidth := len(message)*6 + 10
 	totalWidth := labelWidth + messageWidth
+
+	escapedLabel := html.EscapeString(label)
+	escapedMessage := html.EscapeString(message)
 
 	svg := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="20">
   <linearGradient id="b" x2="0" y2="100%%">
@@ -239,10 +248,10 @@ func generateBadgeSVG(label, message, color string) string {
 		totalWidth,
 		labelWidth, hexColor, labelWidth, messageWidth, labelWidth,
 		totalWidth,
-		labelWidth/2, label,
-		labelWidth/2, label,
-		labelWidth+messageWidth/2, message,
-		labelWidth+messageWidth/2, message,
+		labelWidth/2, escapedLabel,
+		labelWidth/2, escapedLabel,
+		labelWidth+messageWidth/2, escapedMessage,
+		labelWidth+messageWidth/2, escapedMessage,
 	)
 
 	return svg

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"log"
 	"net/http"
 
@@ -20,9 +21,15 @@ import (
 func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *monitor.Executor, dispatcher *notification.Dispatcher) http.Handler {
 	r := chi.NewRouter()
 
+	// Trusted reverse proxies allowed to set X-Forwarded-For (see ClientIP).
+	// Deliberately NOT using chi's middleware.RealIP here: it trusts
+	// X-Forwarded-For/X-Real-IP/True-Client-IP from any client unconditionally,
+	// which let a caller mint a fresh rate-limit bucket per request just by
+	// varying the header - defeating both the global and auth rate limiters.
+	trustedProxies := ParseTrustedProxies(cfg.TrustedProxies)
+
 	// Middleware
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
@@ -51,11 +58,22 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 	// Global rate limiter - 100 requests per minute per IP
 	globalLimiter := NewRateLimiter(100.0/60.0, 20)
 	globalLimiter.CleanupOldLimiters()
-	r.Use(RateLimitMiddleware(globalLimiter))
+	r.Use(RateLimitMiddleware(globalLimiter, trustedProxies))
 
 	// Strict rate limiter for auth endpoints - 5 requests per 15 minutes, burst of 2
 	authLimiter := NewRateLimiter(5.0/900.0, 2)
 	authLimiter.CleanupOldLimiters()
+
+	// Per-account login lockout, independent of the (now un-spoofable, but
+	// still shared-per-proxy) IP-based limiter above.
+	loginAttempts := NewLoginAttemptTracker()
+	loginAttempts.Cleanup()
+
+	// Per-user rate limiter for the notification test endpoint - separate
+	// bucket/map from authLimiter so testing notifications never contends
+	// with login attempts.
+	notificationTestLimiter := NewRateLimiter(5.0/900.0, 2)
+	notificationTestLimiter.CleanupOldLimiters()
 
 	// Initialize OAuth client if enabled
 	// Discovery is now lazy, so initialization won't fail even if OIDC provider is unreachable
@@ -75,9 +93,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 	// API routes
 	r.Route("/api", func(r chi.Router) {
 		// Auth routes with strict rate limiting
-		r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/login", HandleLogin(db, cfg))
-		r.Post("/auth/logout", HandleLogout())
-		r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/setup", HandleSetup(db, cfg))
+		r.With(StrictRateLimitMiddleware(authLimiter, trustedProxies)).Post("/auth/login", HandleLogin(db, cfg, loginAttempts))
+		r.Post("/auth/logout", HandleLogout(db, cfg))
+		r.Post("/auth/refresh", HandleRefreshToken(db, cfg))
+		r.With(StrictRateLimitMiddleware(authLimiter, trustedProxies)).Post("/auth/setup", HandleSetup(db, cfg))
 		r.Get("/auth/status", HandleGetSetupStatus(db))
 
 		// Public status page endpoint (no auth required)
@@ -88,7 +107,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 			r.Get("/auth/oauth/config", HandleGetOAuthConfig(cfg))
 			r.Get("/auth/oauth/authorize", HandleOAuthAuthorize(db, cfg, oauthClient))
 			r.Get("/auth/oauth/callback", HandleOAuthCallback(db, cfg, oauthClient))
-			r.With(StrictRateLimitMiddleware(authLimiter)).Post("/auth/oauth/link", HandleOAuthLinkAccount(db, cfg))
+			r.With(StrictRateLimitMiddleware(authLimiter, trustedProxies)).Post("/auth/oauth/link", HandleOAuthLinkAccount(db, cfg))
 		}
 
 		// Protected routes
@@ -130,7 +149,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 			r.Get("/notifications/{id}", HandleGetNotification(db))
 			r.Put("/notifications/{id}", HandleUpdateNotification(db))
 			r.Delete("/notifications/{id}", HandleDeleteNotification(db))
-			r.Post("/notifications/{id}/test", HandleTestNotification(db, dispatcher))
+			r.With(UserRateLimitMiddleware(notificationTestLimiter, trustedProxies)).Post("/notifications/{id}/test", HandleTestNotification(db, dispatcher))
 
 			// Status Page routes (management)
 			r.Get("/status-pages", HandleGetStatusPages(db))
@@ -173,7 +192,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, hub *websocket.Hub, executor *mo
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Health-Token") != cfg.HealthToken {
+		if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Health-Token")), []byte(cfg.HealthToken)) != 1 {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

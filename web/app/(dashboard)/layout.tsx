@@ -24,15 +24,10 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const token = apiClient.getToken();
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    // Token exists — render content immediately and fetch user info in the background.
-    // This avoids a sequential waterfall where the monitors query couldn't start
-    // until getCurrentUser() completed.
+    // Auth is via an HttpOnly session cookie, so getCurrentUser() (which
+    // relies on it, and transparently refreshes an expired access token
+    // once via apiClient's 401 handling) is the only way to know whether
+    // the user is actually logged in.
     apiClient.getCurrentUser()
       .then(setUser)
       .catch(() => router.push('/login'));

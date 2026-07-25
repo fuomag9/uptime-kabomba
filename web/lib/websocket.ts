@@ -31,15 +31,16 @@ export class WebSocketClient {
   private maxReconnectAttempts = 5;
   private connected = false;
 
-  connect(token?: string) {
+  // Authentication is via the access_token HttpOnly cookie, which the
+  // browser attaches to the WS handshake request automatically - no token
+  // needs to be (or can be) passed from JS.
+  connect() {
     if (typeof window === 'undefined') return; // Don't connect on server side
 
-    const wsUrl = getWebSocketURL();
-    const url = wsUrl;
-    const protocols = token ? [token] : undefined;
+    const url = getWebSocketURL();
 
     try {
-      this.ws = new WebSocket(url, protocols);
+      this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
         console.log('WebSocket connected');
@@ -66,15 +67,15 @@ export class WebSocketClient {
         console.log('WebSocket disconnected');
         this.connected = false;
         this.emit('disconnected', {});
-        this.attemptReconnect(token);
+        this.attemptReconnect();
       };
     } catch (err) {
       console.error('Failed to create WebSocket:', err);
-      this.attemptReconnect(token);
+      this.attemptReconnect();
     }
   }
 
-  private attemptReconnect(token?: string) {
+  private attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('Max reconnection attempts reached');
       return;
@@ -86,7 +87,7 @@ export class WebSocketClient {
     console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     this.reconnectTimer = setTimeout(() => {
-      this.connect(token);
+      this.connect();
     }, delay);
   }
 

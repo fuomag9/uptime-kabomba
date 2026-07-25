@@ -15,6 +15,7 @@ import (
 	"github.com/fuomag9/uptime-kabomba/internal/database"
 	"github.com/fuomag9/uptime-kabomba/internal/jobs"
 	"github.com/fuomag9/uptime-kabomba/internal/monitor"
+	"github.com/fuomag9/uptime-kabomba/internal/netsec"
 	"github.com/fuomag9/uptime-kabomba/internal/notification"
 	"github.com/fuomag9/uptime-kabomba/internal/oauth"
 	"github.com/fuomag9/uptime-kabomba/internal/websocket"
@@ -29,6 +30,12 @@ func main() {
 		AllowPrivateIPs:        cfg.AllowPrivateIPs,
 		AllowMetadataEndpoints: cfg.AllowMetadataEndpoints,
 	})
+
+	// Notification providers (webhook, discord, slack, teams, gotify, ntfy,
+	// smtp) send to user-supplied destinations - guard them with the same
+	// SSRF policy monitors use, so a malicious webhook/server/SMTP host can't
+	// reach cloud metadata endpoints or internal-only services.
+	notification.SetOutboundGuard(netsec.NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints))
 
 	// Initialize database
 	db, err := database.Connect(cfg.Database)
@@ -61,7 +68,7 @@ func main() {
 	// Register page change monitor with Chrome pool (optional)
 	if cfg.ChromeEnabled {
 		if monitor.Available(cfg.ChromePath) {
-			chromePool, err := monitor.NewChromePool(cfg.ChromePath, 5)
+			chromePool, err := monitor.NewChromePool(cfg.ChromePath, cfg.ChromePoolSize)
 			if err != nil {
 				log.Printf("WARNING: Chrome pool initialization failed: %v", err)
 				log.Println("page_change monitor type will be unavailable")

@@ -36,6 +36,10 @@ func (n *NtfyProvider) Send(ctx context.Context, notification *Notification, mes
 		return fmt.Errorf("topic is required")
 	}
 
+	if err := validateOutboundURL(serverURL); err != nil {
+		return err
+	}
+
 	// Default priority based on status
 	if priority == 0 {
 		if message.Status == "down" {

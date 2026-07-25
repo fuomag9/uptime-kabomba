@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { safeDecodeURIComponent } from '@/lib/utils';
 
 export default function OAuthCallbackContent() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function OAuthCallbackContent() {
 
       // Handle OAuth provider error
       if (errorParam) {
-        setError(decodeURIComponent(errorParam));
+        setError(safeDecodeURIComponent(errorParam));
         setTimeout(() => router.push('/login'), 3000);
         return;
       }
@@ -29,9 +30,12 @@ export default function OAuthCallbackContent() {
       }
 
       try {
-        // Call backend callback endpoint (use relative URL for Next.js proxy)
+        // Call backend callback endpoint (use relative URL for Next.js proxy).
+        // On success the response sets the session as HttpOnly cookies
+        // directly - there's no token in the JSON body to store.
         const response = await fetch(
-          `/api/auth/oauth/callback?code=${code}&state=${state}`
+          `/api/auth/oauth/callback?code=${code}&state=${state}`,
+          { credentials: 'include' }
         );
 
         if (!response.ok) {
@@ -42,13 +46,7 @@ export default function OAuthCallbackContent() {
 
         // Handle different response actions
         if (data.action === 'login' || data.action === 'register') {
-          // Store token and redirect to monitors
-          if (data.token) {
-            localStorage.setItem('token', data.token);
-            router.push('/monitors');
-          } else {
-            throw new Error('No token received from server');
-          }
+          router.push('/monitors');
         } else if (data.action === 'link_required') {
           // Redirect to login with linking data
           const params = new URLSearchParams({

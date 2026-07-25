@@ -41,6 +41,10 @@ func (s *SMTPProvider) Send(ctx context.Context, notification *Notification, mes
 		return fmt.Errorf("missing required SMTP configuration")
 	}
 
+	if err := validateOutboundHost(host); err != nil {
+		return err
+	}
+
 	// Default port
 	if port == 0 {
 		if useTLS {

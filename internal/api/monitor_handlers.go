@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -13,6 +14,24 @@ import (
 	"github.com/fuomag9/uptime-kabomba/internal/models"
 	"github.com/fuomag9/uptime-kabomba/internal/monitor"
 )
+
+// minMonitorInterval is the lowest check interval (in seconds) allowed for
+// most monitor types - low enough for responsive monitoring, high enough
+// that a single account can't turn the executor into a tight-loop network
+// scanner or DoS amplifier.
+const minMonitorInterval = 10
+
+// minPageChangeInterval is stricter: a page_change check holds a Chrome pool
+// slot for the whole navigate+render+diff cycle, so a low interval starves
+// the small, process-global pool for every other page_change monitor.
+const minPageChangeInterval = 60
+
+func minimumIntervalFor(monitorType string) int {
+	if monitorType == "page_change" {
+		return minPageChangeInterval
+	}
+	return minMonitorInterval
+}
 
 // MonitorExecutor interface for monitor execution
 type MonitorExecutor interface {
@@ -137,6 +156,11 @@ func HandleCreateMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc
 			return
 		}
 
+		if min := minimumIntervalFor(mon.Type); mon.Interval < min {
+			http.Error(w, fmt.Sprintf("interval must be at least %d seconds for %s monitors", min, mon.Type), http.StatusBadRequest)
+			return
+		}
+
 		// Convert to internal monitor type for validation
 		internalMon := &monitor.Monitor{
 			Name:     mon.Name,
@@ -212,6 +236,11 @@ func HandleUpdateMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc
 		monitorType, ok := monitor.GetMonitorType(mon.Type)
 		if !ok {
 			http.Error(w, "Invalid monitor type", http.StatusBadRequest)
+			return
+		}
+
+		if min := minimumIntervalFor(mon.Type); mon.Interval < min {
+			http.Error(w, fmt.Sprintf("interval must be at least %d seconds for %s monitors", min, mon.Type), http.StatusBadRequest)
 			return
 		}
 
@@ -312,10 +341,27 @@ func HandleDeleteMonitor(db *gorm.DB, executor MonitorExecutor) http.HandlerFunc
 	}
 }
 
+// maxHeartbeatsLimit caps how many heartbeat rows a single request can pull
+// back, regardless of the requested limit/period/range.
+const maxHeartbeatsLimit = 5000
+
 // HandleGetHeartbeats returns heartbeats for a monitor with optional period filtering
 func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user := r.Context().Value(userContextKey).(*models.User)
 		monitorID := chi.URLParam(r, "id")
+
+		// Verify ownership before returning any heartbeat data. Return 404
+		// (not 403) on both "doesn't exist" and "not yours" so this endpoint
+		// can't be used to enumerate other tenants' monitor IDs.
+		var owned int64
+		db.Model(&models.Monitor{}).
+			Where("id = ? AND user_id = ?", monitorID, user.ID).
+			Count(&owned)
+		if owned == 0 {
+			http.Error(w, "Monitor not found", http.StatusNotFound)
+			return
+		}
 
 		// Get query params
 		limitStr := r.URL.Query().Get("limit")
@@ -326,8 +372,10 @@ func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 		// Set default limit based on period
 		limit := 100
 		if limitStr != "" {
-			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 200000 {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= maxHeartbeatsLimit {
 				limit = l
+			} else if err == nil && l > maxHeartbeatsLimit {
+				limit = maxHeartbeatsLimit
 			}
 		} else {
 			var intervalSeconds int
@@ -363,6 +411,7 @@ func HandleGetHeartbeats(db *gorm.DB) http.HandlerFunc {
 				if duration > 0 {
 					estimated := int(math.Ceil(duration.Seconds() / float64(intervalSeconds)))
 					estimated = int(float64(estimated) * 1.1) // small buffer for jitter
+					estimated = min(estimated, maxHeartbeatsLimit)
 					if estimated > limit {
 						limit = estimated
 					}

@@ -31,6 +31,10 @@ func (w *WebhookProvider) Send(ctx context.Context, notification *Notification, 
 		return fmt.Errorf("webhook_url is required")
 	}
 
+	if err := validateOutboundURL(url); err != nil {
+		return err
+	}
+
 	// Default method to POST
 	if method == "" {
 		method = "POST"

@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/fuomag9/uptime-kabomba/internal/netsec"
 )
 
 // HTTPMonitor implements HTTP/HTTPS monitoring.
@@ -41,7 +43,7 @@ func (h *HTTPMonitor) Validate(monitor *Monitor) error {
 
 	// SSRF Protection - validate URL to prevent access to private IPs and metadata endpoints
 	cfg := GetConfig()
-	ssrfProtection := NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints)
+	ssrfProtection := netsec.NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints)
 	if err := ssrfProtection.ValidateURL(monitor.URL); err != nil {
 		return fmt.Errorf("URL validation failed: %w", err)
 	}
@@ -116,17 +118,37 @@ func (h *HTTPMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 		}
 	}
 
+	// SSRF Protection - re-resolved and re-validated on every dial, including
+	// ones net/http's Transport makes when following a redirect. This closes
+	// two gaps a create-time-only ValidateURL call leaves open: a redirect to
+	// a disallowed host (Validate() only ever saw the original URL), and a
+	// DNS answer that changes between requests (rebinding). The connection is
+	// made to the freshly validated IP literal; the original hostname is left
+	// untouched for the Host header and TLS SNI/certificate verification.
+	checkCfg := GetConfig()
+	ssrfProtection := netsec.NewSSRFProtection(checkCfg.AllowPrivateIPs, checkCfg.AllowMetadataEndpoints)
+
 	// Create HTTP client with IP version support
 	client := &http.Client{
 		Timeout: time.Duration(monitor.Timeout) * time.Second,
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				host, port, err := net.SplitHostPort(addr)
+				if err != nil {
+					return nil, fmt.Errorf("invalid address %q: %w", addr, err)
+				}
+
+				ip, err := ssrfProtection.ResolveHost(host)
+				if err != nil {
+					return nil, err
+				}
+
 				// Determine network based on IP version preference
 				network = GetNetworkForIPVersion(network, monitor.IPVersion)
 				dialer := &net.Dialer{
 					Timeout: time.Duration(monitor.Timeout) * time.Second,
 				}
-				return dialer.DialContext(ctx, network, addr)
+				return dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
 			},
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: ignoreTLS,

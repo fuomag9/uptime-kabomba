@@ -2,12 +2,17 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"sync"
 
 	"github.com/chromedp/chromedp"
 )
+
+// ErrPoolSaturated is returned by AcquireContext when every pool slot is
+// currently in use.
+var ErrPoolSaturated = errors.New("chrome pool is saturated")
 
 // ChromePool manages a pool of Chrome browser contexts for concurrent page checks.
 type ChromePool struct {
@@ -63,6 +68,13 @@ func NewChromePool(chromePath string, maxConcurrent int) (*ChromePool, error) {
 
 // AcquireContext acquires a semaphore slot and returns a new Chrome tab context.
 // The caller must call the returned cancel function and then Release() when done.
+//
+// It does NOT queue when the pool is full: it returns ErrPoolSaturated
+// immediately. The pool is a small, process-global resource shared by every
+// page_change monitor; letting checks queue for a slot meant a handful of
+// monitors hitting a slow/hanging URL could tie up every other page_change
+// monitor's goroutine for its entire check timeout. Failing fast lets the
+// caller report "skipped, pool busy" and try again next interval instead.
 func (p *ChromePool) AcquireContext(ctx context.Context) (context.Context, context.CancelFunc, error) {
 	p.mu.Lock()
 	if p.closed {
@@ -71,11 +83,10 @@ func (p *ChromePool) AcquireContext(ctx context.Context) (context.Context, conte
 	}
 	p.mu.Unlock()
 
-	// Acquire semaphore slot (blocks if pool is full)
 	select {
 	case p.sem <- struct{}{}:
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
+	default:
+		return nil, nil, ErrPoolSaturated
 	}
 
 	tabCtx, tabCancel := chromedp.NewContext(p.allocCtx)

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/fuomag9/uptime-kabomba/internal/netsec"
 )
 
 // TCPMonitor checks if a TCP port is open
@@ -72,6 +74,14 @@ func (t *TCPMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, e
 func (t *TCPMonitor) Validate(monitor *Monitor) error {
 	if monitor.URL == "" {
 		return fmt.Errorf("host is required")
+	}
+
+	// SSRF protection - tcp accepts a bare host, not a URL, so validate it
+	// with the host-only entry point rather than ValidateURL.
+	cfg := GetConfig()
+	ssrfProtection := netsec.NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints)
+	if err := ssrfProtection.ValidateHost(monitor.URL); err != nil {
+		return fmt.Errorf("host validation failed: %w", err)
 	}
 
 	// Validate port if provided

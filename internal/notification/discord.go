@@ -29,6 +29,10 @@ func (d *DiscordProvider) Send(ctx context.Context, notification *Notification, 
 		return fmt.Errorf("webhook_url is required")
 	}
 
+	if err := validateOutboundURL(webhookURL); err != nil {
+		return err
+	}
+
 	// Default username
 	if username == "" {
 		username = "Uptime Kabomba"

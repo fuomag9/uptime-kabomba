@@ -26,8 +26,11 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secret}
       - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-disable}
       - PORT=8080
-      - METRICS_TOKEN=${METRICS_TOKEN:-change-me}
-      - HEALTH_TOKEN=${HEALTH_TOKEN:-change-me}
+      # No insecure fallback: METRICS_TOKEN/HEALTH_TOKEN gate publicly
+      # reachable endpoints, so they must be set explicitly (e.g. in .env) or
+      # the backend refuses to start.
+      - METRICS_TOKEN=${METRICS_TOKEN:?METRICS_TOKEN must be set}
+      - HEALTH_TOKEN=${HEALTH_TOKEN:?HEALTH_TOKEN must be set}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - JWT_SECRET=${JWT_SECRET}
       - APP_URL=${APP_URL:-http://localhost:3000}
@@ -54,7 +57,7 @@ services:
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "--header", "X-Health-Token: ${HEALTH_TOKEN:-change-me}", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "--header", "X-Health-Token: ${HEALTH_TOKEN:?HEALTH_TOKEN must be set}", "http://localhost:8080/health"]
       interval: 30s
       timeout: 3s
       retries: 3

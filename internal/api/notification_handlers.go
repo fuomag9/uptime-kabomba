@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -272,10 +273,14 @@ func HandleTestNotification(db *gorm.DB, dispatcher *notification.Dispatcher) ht
 			Active:    modelNotif.Active,
 		}
 
-		// Send test notification
+		// Send test notification. The error is logged, not reflected to the
+		// caller: provider errors (e.g. "webhook returned status 200" vs a
+		// connection failure) would otherwise let an attacker use this
+		// endpoint as a port-scan/connectivity oracle against internal hosts.
 		err = dispatcher.TestNotification(r.Context(), notif)
 		if err != nil {
-			http.Error(w, "Failed to send test notification: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("Test notification failed for notification %d (%s): %v", modelNotif.ID, modelNotif.Type, err)
+			http.Error(w, "Failed to send test notification", http.StatusInternalServerError)
 			return
 		}
 

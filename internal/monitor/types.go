@@ -13,7 +13,10 @@ type MonitorType interface {
 	// Name returns the monitor type name (e.g., "http", "tcp", "ping")
 	Name() string
 
-	// Check performs the monitor check and returns a heartbeat
+	// Check performs the monitor check and returns a heartbeat. A nil
+	// heartbeat with a nil error means the check was intentionally skipped
+	// this cycle (e.g. a shared resource like the Chrome pool was
+	// saturated) - the executor won't save, broadcast, or notify for it.
 	Check(ctx context.Context, monitor *Monitor) (*Heartbeat, error)
 
 	// Validate validates the monitor configuration

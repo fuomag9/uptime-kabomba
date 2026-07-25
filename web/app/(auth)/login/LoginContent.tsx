@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { safeDecodeURIComponent } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,13 +46,13 @@ export default function LoginContent() {
         setShowLinkingForm(true);
         setLinkingData({ token, email });
         if (message) {
-          setError(decodeURIComponent(message));
+          setError(safeDecodeURIComponent(message));
         }
       }
     } else if (action === 'error') {
       const message = searchParams.get('message');
       if (message) {
-        setError(decodeURIComponent(message));
+        setError(safeDecodeURIComponent(message));
       }
     }
   }, [searchParams]);

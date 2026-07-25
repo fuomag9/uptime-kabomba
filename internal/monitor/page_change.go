@@ -3,16 +3,22 @@ package monitor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/chromedp/cdproto/fetch"
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 	"gorm.io/gorm"
+
+	"github.com/fuomag9/uptime-kabomba/internal/netsec"
 )
 
 // PageChangeSnapshot represents a stored snapshot for page change detection.
@@ -68,7 +74,7 @@ func (p *PageChangeMonitor) Validate(monitor *Monitor) error {
 
 	// SSRF protection
 	cfg := GetConfig()
-	ssrfProtection := NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints)
+	ssrfProtection := netsec.NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints)
 	if err := ssrfProtection.ValidateURL(monitor.URL); err != nil {
 		return fmt.Errorf("URL validation failed: %w", err)
 	}
@@ -133,9 +139,19 @@ func (p *PageChangeMonitor) Check(ctx context.Context, monitor *Monitor) (*Heart
 	htmlWeight := getConfigFloat(monitor, "html_weight", 0.3)
 	runtimeWeight := getConfigFloat(monitor, "runtime_weight", 0.3)
 
-	// Acquire Chrome tab
+	// Acquire Chrome tab. The pool fails fast (rather than queuing) when
+	// saturated, so a burst of slow page_change checks can't tie up every
+	// other page_change monitor's goroutine for its full timeout. Returning
+	// (nil, nil) tells the executor to skip this cycle entirely rather than
+	// recording a heartbeat - recording one (even as "pending") would count
+	// against the monitor's uptime percentage (total_checks includes every
+	// row) for a cycle that never actually checked anything.
 	tabCtx, tabCancel, err := p.pool.AcquireContext(ctx)
 	if err != nil {
+		if errors.Is(err, ErrPoolSaturated) {
+			log.Printf("page_change monitor %d: skipped, Chrome pool busy", monitor.ID)
+			return nil, nil
+		}
 		heartbeat.Message = fmt.Sprintf("Failed to acquire Chrome context: %v", err)
 		return heartbeat, nil
 	}
@@ -358,15 +374,52 @@ func (p *PageChangeMonitor) rotateBaseline(monitorID int, snapshot *PageChangeSn
 }
 
 // capturePage uses Chrome to navigate to a URL and capture screenshot, HTML, and runtime metrics.
-func (p *PageChangeMonitor) capturePage(ctx context.Context, url string, waitTimeMs, viewportWidth, viewportHeight int, ignoreSelectors, watchSelectors []string, customJS string) (screenshot []byte, html string, runtimeMetrics map[string]interface{}, err error) {
+func (p *PageChangeMonitor) capturePage(ctx context.Context, targetURL string, waitTimeMs, viewportWidth, viewportHeight int, ignoreSelectors, watchSelectors []string, customJS string) (screenshot []byte, html string, runtimeMetrics map[string]interface{}, err error) {
+	// SSRF protection - Validate() only ever checked the monitor's configured
+	// URL. Chrome does its own DNS resolution and can be sent anywhere by a
+	// redirect or by a sub-resource the page loads, so intercept every
+	// network request Chrome makes for this tab and block any whose current
+	// (freshly resolved) destination is disallowed. This also re-validates
+	// the main navigation itself immediately before it happens, closing the
+	// DNS-rebinding gap a one-time create-time check leaves open.
+	cfg := GetConfig()
+	ssrfProtection := netsec.NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints)
+
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
+		reqEv, ok := ev.(*fetch.EventRequestPaused)
+		if !ok {
+			return
+		}
+		go func() {
+			reqURL := reqEv.Request.URL
+			if parsed, parseErr := neturl.Parse(reqURL); parseErr == nil &&
+				parsed.Scheme != "http" && parsed.Scheme != "https" {
+				// Non-network schemes (data:, blob:, about:, etc.) never
+				// reach an attacker-influenced host - let them through.
+				_ = chromedp.Run(ctx, fetch.ContinueRequest(reqEv.RequestID))
+				return
+			}
+			if err := ssrfProtection.ValidateURL(reqURL); err != nil {
+				log.Printf("page_change: blocked request to disallowed host (%s): %v", reqURL, err)
+				_ = chromedp.Run(ctx, fetch.FailRequest(reqEv.RequestID, network.ErrorReasonBlockedByClient))
+				return
+			}
+			_ = chromedp.Run(ctx, fetch.ContinueRequest(reqEv.RequestID))
+		}()
+	})
+
+	if err := chromedp.Run(ctx, fetch.Enable().WithPatterns([]*fetch.RequestPattern{{URLPattern: "*"}})); err != nil {
+		return nil, "", nil, fmt.Errorf("failed to enable request interception: %w", err)
+	}
+
 	// Set viewport
 	if err := chromedp.Run(ctx, chromedp.EmulateViewport(int64(viewportWidth), int64(viewportHeight))); err != nil {
 		return nil, "", nil, fmt.Errorf("failed to set viewport: %w", err)
 	}
 
 	// Navigate to page
-	if err := chromedp.Run(ctx, chromedp.Navigate(url)); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to navigate to %s: %w", url, err)
+	if err := chromedp.Run(ctx, chromedp.Navigate(targetURL)); err != nil {
+		return nil, "", nil, fmt.Errorf("failed to navigate to %s: %w", targetURL, err)
 	}
 
 	// Wait for page to stabilize

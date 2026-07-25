@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -26,6 +27,8 @@ type Config struct {
 	ScreenshotStoragePath  string
 	ChromePath             string
 	ChromeEnabled          bool
+	ChromePoolSize         int
+	TrustedProxies         []string
 }
 
 // DatabaseConfig holds database configuration
@@ -71,6 +74,8 @@ func Load() *Config {
 		ScreenshotStoragePath:  getEnv("SCREENSHOT_STORAGE_PATH", "./data/screenshots"),
 		ChromePath:             getEnv("CHROME_PATH", ""),
 		ChromeEnabled:          getEnvBool("CHROME_ENABLED", true),
+		ChromePoolSize:         getEnvInt("CHROME_POOL_SIZE", 5),
+		TrustedProxies:         splitAndTrim(getEnv("TRUSTED_PROXIES", ""), ","),
 	}
 
 	// Validate configuration
@@ -103,6 +108,19 @@ func buildPostgresDSN() string {
 	return u.String()
 }
 
+// insecureDefaultSecrets are placeholder values that must never be used for
+// a real secret/token - whether shipped as a Dockerfile ENV default or typed
+// in by a user who didn't realize the field mattered.
+var insecureDefaultSecrets = []string{
+	"change-this-secret-in-production",
+	"change-me-in-production",
+	"change-me",
+	"changeme",
+	"secret",
+	"password",
+	"test",
+}
+
 // Validate validates the configuration
 func (c *Config) Validate() error {
 	if c.Environment == "production" {
@@ -110,18 +128,8 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("JWT_SECRET must be at least 32 characters in production")
 		}
 
-		// Check for insecure default secrets
-		insecureSecrets := []string{
-			"change-this-secret-in-production",
-			"change-me-in-production",
-			"secret",
-			"password",
-			"changeme",
-		}
-		for _, insecure := range insecureSecrets {
-			if c.JWTSecret == insecure {
-				return fmt.Errorf("JWT_SECRET is set to an insecure default value. Please set a strong random secret")
-			}
+		if slices.Contains(insecureDefaultSecrets, c.JWTSecret) {
+			return fmt.Errorf("JWT_SECRET is set to an insecure default value. Please set a strong random secret")
 		}
 	}
 
@@ -136,9 +144,15 @@ func (c *Config) Validate() error {
 	if c.MetricsToken == "" {
 		return fmt.Errorf("METRICS_TOKEN must be set")
 	}
+	if slices.Contains(insecureDefaultSecrets, c.MetricsToken) {
+		return fmt.Errorf("METRICS_TOKEN is set to an insecure default value (e.g. \"change-me\"). Please set a strong random token")
+	}
 
 	if c.HealthToken == "" {
 		return fmt.Errorf("HEALTH_TOKEN must be set")
+	}
+	if slices.Contains(insecureDefaultSecrets, c.HealthToken) {
+		return fmt.Errorf("HEALTH_TOKEN is set to an insecure default value (e.g. \"change-me\"). Please set a strong random token")
 	}
 
 	// Validate OAuth config if enabled
@@ -149,7 +163,13 @@ func (c *Config) Validate() error {
 		if c.OAuth.ClientID == "" || c.OAuth.ClientSecret == "" {
 			return fmt.Errorf("OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required when OAuth is enabled")
 		}
-		// OAuth redirect URL is derived from APP_URL
+		// redirect_uri is derived solely from APP_URL and must be fixed at
+		// startup - never from a request header - or a caller could set
+		// their own Origin/Referer to redirect the IdP's auth code to an
+		// attacker-controlled callback URL.
+		if c.OAuth.RedirectURL == "" {
+			return fmt.Errorf("APP_URL must be set when OAuth is enabled (used to derive the OAuth redirect_uri)")
+		}
 	}
 
 	return nil

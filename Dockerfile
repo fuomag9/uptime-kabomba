@@ -41,6 +41,10 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider --header "X-Health-Token: ${HEALTH_TOKEN}" http://localhost:8080/health || exit 1
 
 # Set environment variables
+# METRICS_TOKEN and HEALTH_TOKEN are intentionally NOT defaulted here: they
+# gate publicly-reachable endpoints (/metrics, /health), so the app fails
+# closed at startup (see config.Validate) rather than running with a
+# guessable shared secret. Set both explicitly when running this image.
 ENV CHROME_PATH=/usr/bin/chromium-browser \
     SCREENSHOT_STORAGE_PATH=/app/data/screenshots \
     DATABASE_TYPE=postgres \
@@ -50,8 +54,6 @@ ENV CHROME_PATH=/usr/bin/chromium-browser \
     POSTGRES_USER=uptime \
     POSTGRES_PASSWORD=secret \
     POSTGRES_SSLMODE=disable \
-    METRICS_TOKEN=change-me \
-    HEALTH_TOKEN=change-me \
     PORT=8080
 
 # Run the application

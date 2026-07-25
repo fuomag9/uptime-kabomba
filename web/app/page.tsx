@@ -21,20 +21,16 @@ export default function Home() {
           return;
         }
 
-        // Setup is complete, check if user is already logged in
-        const token = apiClient.getToken();
-        if (token) {
-          try {
-            await apiClient.getCurrentUser();
-            // User is logged in, redirect to monitors
-            router.push('/monitors');
-            return;
-          } catch (err) {
-            // Token is invalid, continue to show login page
-          }
+        // Setup is complete - check if the user is already logged in via the
+        // session cookie (unreadable from JS, so this is the only way to know).
+        try {
+          await apiClient.getCurrentUser();
+          router.push('/monitors');
+          return;
+        } catch (err) {
+          // Not logged in (or session expired) - fall through to login.
         }
 
-        // Setup is complete but user is not logged in, redirect to login
         router.push('/login');
       } catch (err) {
         console.error('Error checking setup status:', err);

@@ -156,6 +156,12 @@ func (job *monitorJob) runCheck() {
 		log.Printf("Monitor check failed for %s (ID: %d): %v", monitor.Name, monitor.ID, err)
 		return
 	}
+	if heartbeat == nil {
+		// The check was intentionally skipped this cycle (e.g. page_change
+		// finding the Chrome pool saturated) - nothing to save, broadcast,
+		// or notify about; try again next tick.
+		return
+	}
 
 	// Save heartbeat to database
 	if err := job.saveHeartbeat(heartbeat); err != nil {
@@ -163,9 +169,9 @@ func (job *monitorJob) runCheck() {
 		return
 	}
 
-	// Broadcast heartbeat via WebSocket
+	// Broadcast heartbeat via WebSocket, scoped to the monitor's owner only.
 	if job.executor.hub != nil {
-		job.executor.hub.Broadcast("heartbeat", heartbeat)
+		job.executor.hub.BroadcastToUser(monitor.UserID, "heartbeat", heartbeat)
 	}
 
 	// Detect status changes and send notifications

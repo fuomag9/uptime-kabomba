@@ -7,11 +7,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 export interface LoginRequest {
   username: string;
   password: string;
-  token?: string; // 2FA token
 }
 
 export interface LoginResponse {
-  token: string;
   user: User;
 }
 
@@ -31,7 +29,6 @@ export interface OAuthConfig {
 
 export interface OAuthCallbackResponse {
   action: 'login' | 'link_required' | 'register' | 'error';
-  token?: string;
   user?: User;
   linking_token?: string;
   email?: string;
@@ -50,54 +47,42 @@ export interface ApiError {
 
 class ApiClient {
   private baseUrl: string;
-  private token: string | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
-
-    // Load token from localStorage on client side
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('token');
-    }
   }
 
-  setToken(token: string | null) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('token', token);
-      } else {
-        localStorage.removeItem('token');
-      }
-    }
-  }
-
-  getToken(): string | null {
-    return this.token;
-  }
-
+  // The access/refresh tokens live in HttpOnly cookies set by the backend -
+  // never readable from JS, and sent automatically by the browser via
+  // `credentials: 'include'`. There is nothing for the client to store or
+  // attach itself; on a 401 (which includes normal access-token expiry,
+  // ~15 minutes) we transparently try /api/auth/refresh once and retry the
+  // original request rather than forcing a re-login every 15 minutes.
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    isRetry = false
   ): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include',
     });
 
     if (!response.ok) {
-      // Clear token on authentication errors
-      if (response.status === 401) {
-        this.setToken(null);
+      const canRetry =
+        response.status === 401 &&
+        !isRetry &&
+        endpoint !== '/api/auth/refresh' &&
+        endpoint !== '/api/auth/login';
+
+      if (canRetry && (await this.tryRefresh())) {
+        return this.request<T>(endpoint, options, true);
       }
 
       const error: ApiError = {
@@ -116,30 +101,37 @@ class ApiClient {
     return JSON.parse(text);
   }
 
+  private async tryRefresh(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
   // Auth endpoints
   async login(data: LoginRequest): Promise<LoginResponse> {
-    const response = await this.request<LoginResponse>('/api/auth/login', {
+    return this.request<LoginResponse>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    this.setToken(response.token);
-    return response;
   }
 
   async setup(data: LoginRequest): Promise<LoginResponse> {
-    const response = await this.request<LoginResponse>('/api/auth/setup', {
+    return this.request<LoginResponse>('/api/auth/setup', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    this.setToken(response.token);
-    return response;
   }
 
   async logout(): Promise<void> {
     await this.request('/api/auth/logout', {
       method: 'POST',
     });
-    this.setToken(null);
   }
 
   async getCurrentUser(): Promise<User> {
@@ -152,12 +144,10 @@ class ApiClient {
   }
 
   async linkOAuthAccount(data: LinkAccountRequest): Promise<LoginResponse> {
-    const response = await this.request<LoginResponse>('/api/auth/oauth/link', {
+    return this.request<LoginResponse>('/api/auth/oauth/link', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    this.setToken(response.token);
-    return response;
   }
 
   async getSetupStatus(): Promise<{ setupComplete: boolean }> {

@@ -91,6 +91,13 @@ func HandleChangePassword(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
+		// Revoke every outstanding refresh token for this account: if the
+		// password was changed because a credential/session leaked, a
+		// stolen refresh token should stop working the moment the user
+		// notices and rotates their password, not silently keep minting
+		// fresh access tokens until it expires on its own.
+		revokeAllRefreshTokensForUser(db, user.ID)
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": "Password changed successfully"})
 	}

@@ -41,11 +41,11 @@ func HandleOAuthAuthorize(db *gorm.DB, cfg *config.Config, oauthClient *oauth.Cl
 			return
 		}
 
-		// Determine redirect URL (use configured or construct from request)
+		// redirect_uri is always derived from APP_URL (config.Validate enforces
+		// this is non-empty whenever OAuth is enabled) - never from
+		// request headers, which are attacker-controlled and would let a
+		// caller redirect the IdP's authorization code to their own host.
 		redirectURL := cfg.OAuth.RedirectURL
-		if redirectURL == "" {
-			redirectURL = getRedirectURL(r)
-		}
 
 		// Store session in database (10 minute expiry)
 		session := models.OAuthSession{
@@ -79,10 +79,12 @@ func HandleOAuthAuthorize(db *gorm.DB, cfg *config.Config, oauthClient *oauth.Cl
 	}
 }
 
-// OAuthCallbackResponse represents the OAuth callback response
+// OAuthCallbackResponse represents the OAuth callback response. No token
+// field: a successful "login"/"register" sets HttpOnly session cookies
+// directly on the response (see handleOAuthUser/issueSession) instead of
+// handing the token to client-side JS.
 type OAuthCallbackResponse struct {
 	Action       string       `json:"action"` // "login", "link_required", "register", "error"
-	Token        *string      `json:"token,omitempty"`
 	User         *models.User `json:"user,omitempty"`
 	LinkingToken *string      `json:"linking_token,omitempty"`
 	Email        *string      `json:"email,omitempty"`
@@ -137,15 +139,17 @@ func HandleOAuthCallback(db *gorm.DB, cfg *config.Config, oauthClient *oauth.Cli
 		}
 
 		// Handle user authentication/registration/linking
-		response := handleOAuthUser(db, cfg, userInfo)
+		response := handleOAuthUser(w, db, cfg, userInfo)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	}
 }
 
-// handleOAuthUser processes OAuth user login/registration/linking
-func handleOAuthUser(db *gorm.DB, cfg *config.Config, userInfo *oauth.UserInfo) OAuthCallbackResponse {
+// handleOAuthUser processes OAuth user login/registration/linking. On a
+// successful login/register it sets session cookies directly on w (see
+// issueSession) - the returned response never carries the token itself.
+func handleOAuthUser(w http.ResponseWriter, db *gorm.DB, cfg *config.Config, userInfo *oauth.UserInfo) OAuthCallbackResponse {
 	provider := "oidc"
 
 	// Scenario 1: Check if user already exists with this provider+subject
@@ -154,9 +158,8 @@ func handleOAuthUser(db *gorm.DB, cfg *config.Config, userInfo *oauth.UserInfo) 
 	if err == nil {
 		// User exists with OAuth, log them in
 		log.Printf("OAuth: Existing OAuth user logging in: %s", userInfo.Email)
-		token, err := generateJWT(existingOAuthUser.ID, cfg.JWTSecret)
-		if err != nil {
-			log.Println("OAuth: Failed to generate JWT:", err)
+		if err := issueSession(w, db, cfg, existingOAuthUser.ID); err != nil {
+			log.Println("OAuth: Failed to issue session:", err)
 			return OAuthCallbackResponse{
 				Action:  "error",
 				Message: "Failed to generate authentication token",
@@ -165,7 +168,6 @@ func handleOAuthUser(db *gorm.DB, cfg *config.Config, userInfo *oauth.UserInfo) 
 
 		return OAuthCallbackResponse{
 			Action: "login",
-			Token:  &token,
 			User:   &existingOAuthUser,
 		}
 	}
@@ -232,10 +234,8 @@ func handleOAuthUser(db *gorm.DB, cfg *config.Config, userInfo *oauth.UserInfo) 
 		}
 	}
 
-	// Generate JWT for new user
-	token, err := generateJWT(newUser.ID, cfg.JWTSecret)
-	if err != nil {
-		log.Println("OAuth: Failed to generate JWT:", err)
+	if err := issueSession(w, db, cfg, newUser.ID); err != nil {
+		log.Println("OAuth: Failed to issue session:", err)
 		return OAuthCallbackResponse{
 			Action:  "error",
 			Message: "Failed to generate authentication token",
@@ -244,7 +244,6 @@ func handleOAuthUser(db *gorm.DB, cfg *config.Config, userInfo *oauth.UserInfo) 
 
 	return OAuthCallbackResponse{
 		Action: "register",
-		Token:  &token,
 		User:   &newUser,
 	}
 }
@@ -309,18 +308,15 @@ func HandleOAuthLinkAccount(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		// Delete linking token (successful linking)
 		db.Delete(&linking)
 
-		// Generate JWT
-		token, err := generateJWT(user.ID, cfg.JWTSecret)
-		if err != nil {
-			log.Println("OAuth: Failed to generate JWT after linking:", err)
+		if err := issueSession(w, db, cfg, user.ID); err != nil {
+			log.Println("OAuth: Failed to issue session after linking:", err)
 			http.Error(w, "Failed to generate authentication token", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(LoginResponse{
-			Token: token,
-			User:  &user,
+			User: &user,
 		})
 	}
 }
@@ -380,29 +376,4 @@ func generateUsername(email string, db *gorm.DB) string {
 	}
 
 	return username
-}
-
-// getRedirectURL constructs the OAuth redirect URL from the request
-// Returns the FRONTEND URL, not the backend URL, since OIDC provider
-// should redirect users to the frontend, not directly to backend
-func getRedirectURL(r *http.Request) string {
-	// Try to get frontend URL from Origin or Referer header
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		origin = r.Header.Get("Referer")
-		if origin != "" {
-			// Extract just the origin from referer URL
-			if idx := strings.Index(origin[8:], "/"); idx != -1 {
-				origin = origin[:8+idx]
-			}
-		}
-	}
-
-	// Fallback to localhost:3000 if no origin detected
-	if origin == "" {
-		origin = "http://localhost:3000"
-	}
-
-	// OAuth callback goes to frontend, not backend
-	return origin + "/oauth/callback"
 }

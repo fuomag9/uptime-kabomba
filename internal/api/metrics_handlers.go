@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strings"
@@ -25,7 +26,7 @@ func escapePrometheusLabel(s string) string {
 // HandlePrometheusMetrics exports metrics in Prometheus format
 func HandlePrometheusMetrics(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Metrics-Token") != cfg.MetricsToken {
+		if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Metrics-Token")), []byte(cfg.MetricsToken)) != 1 {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

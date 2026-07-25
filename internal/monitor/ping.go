@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/go-ping/ping"
+
+	"github.com/fuomag9/uptime-kabomba/internal/netsec"
 )
 
 // PingMonitor performs ICMP ping checks
@@ -118,6 +120,14 @@ func (p *PingMonitor) Check(ctx context.Context, monitor *Monitor) (*Heartbeat, 
 func (p *PingMonitor) Validate(monitor *Monitor) error {
 	if monitor.URL == "" {
 		return fmt.Errorf("host is required")
+	}
+
+	// SSRF protection - ping accepts a bare host, not a URL, so validate it
+	// with the host-only entry point rather than ValidateURL.
+	cfg := GetConfig()
+	ssrfProtection := netsec.NewSSRFProtection(cfg.AllowPrivateIPs, cfg.AllowMetadataEndpoints)
+	if err := ssrfProtection.ValidateHost(monitor.URL); err != nil {
+		return fmt.Errorf("host validation failed: %w", err)
 	}
 
 	// Validate packet count
